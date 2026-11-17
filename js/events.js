@@ -259,11 +259,13 @@ ev('bigclient', [18, 90], 3, function (s) { return s.biz.length > 0; }, function
     O('Підписати', function () { if (chance(.75)) { b.cash += b.cap * 0.25; return 'Контракт приніс солідний прибуток.'; } b.cash -= b.cap * 0.15; return 'Клієнт затримав оплату — касовий розрив.'; }),
     O('Відмовитися', function () { return 'Ти не ризикуєш.'; })] };
 });
-ev('taxcheck', [18, 90], function (s) { return C(s).gdp < 30 ? 3 : 1; }, function (s) { return s.biz.length > 0; }, function (s) {
-  var b = pick(s.biz), fine = b.cap * 0.15;
-  return { text: 'До «' + b.name + '» прийшла податкова перевірка.', opts: [
-    O('Все за законом', function () { if (chance(.6)) return 'Порушень не знайшли.'; b.cash -= fine * 0.5; return 'Знайшли дрібні порушення — штраф ' + fmt(fine * 0.5) + '.'; }),
-    O('«Домовитися»', function () { if (chance(.25)) { b.cash -= fine * 3; add(s, { happy: -10 }); return 'Хабар не спрацював — величезний штраф і скандал.'; } b.cash -= fine * 0.3; return 'Перевірка «нічого не знайшла».'; })] };
+ev('taxcheck', [18, 90], function (s) { return C(s).gdp < 30 ? 3 : 1.5; }, function (s) { return s.biz.length > 0; }, function (s) {
+  var b = pick(s.biz), fine = b.cap * 0.15, q = bizQ(s, b), dirty = s.lastShadow && s.age - s.lastShadow <= 3;
+  var pClean = dirty ? 0.6 : q < 35 ? 0.2 : 0.05;
+  var bribe = b.cap * 0.05 * (cartel(s) ? 0.5 : 1), pBribe = clamp(1.05 - C(s).law * 1.1 + (cartel(s) ? 0.25 : 0), 0.05, 0.92);
+  return { text: 'До «' + b.name + '» прийшла податкова перевірка.' + (dirty ? ' Нещодавні заробітки «в конверті» можуть спливти.' : ''), opts: [
+    O('Показати все як є', function () { if (!chance(pClean)) return 'Перевірка пройшла чисто — порушень не знайшли.'; b.cash -= fine * (dirty ? 1.5 : 0.4); return dirty ? 'Знайшли неоформлені доходи: штраф ' + fmt(fine * 1.5) + '.' : 'Знайшли помилки в документах: штраф ' + fmt(fine * 0.4) + '.'; }, 'ризик штрафу ~' + Math.round(pClean * 100) + '%' + (dirty ? ' (через тіньові заробітки)' : q < 35 ? ' (безлад у документах)' : '')),
+    O('Дати хабар ' + fmt(bribe), function () { b.cash -= bribe; if (chance(pBribe)) return 'Інспектор узяв конверт і пішов. Більше нічого платити не треба.'; b.cash -= fine * 2.5; s.record++; s.recordAge = s.age; add(s, { happy: -10 }); return 'Хабар не взяли — це була провокація. Великий штраф ' + fmt(fine * 2.5) + ' і судимість.'; }, 'спрацює з шансом ~' + Math.round(pBribe * 100) + '%; провал — великий штраф і судимість')] };
 });
 ev('promo_job', [20, 60], 2, function (s) { return s.job && JOB[s.job.id] && JOB[s.job.id].id === 'dev' || (s.sk.code > 60 && s.age > 18); }, function (s) {
   s.fame = clamp(s.fame + 8); s.port.code = (s.port.code || 0) + 2;

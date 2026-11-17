@@ -17,8 +17,8 @@
     catch (e) { while (ids.length > 1) { delete all[ids.pop()]; try { localStorage.setItem(SKEY, JSON.stringify(all)); return; } catch (e2) { } } }
   }
   function unsave(id) { var all = saves(); delete all[id]; store(SKEY, all); }
-  function load(id) { var s = saves()[id]; if (!s) return; S = s; if (!S.d) S.d = S.q * 2 - 1; S.cur = S.log[S.log.length - 1]; Q = []; tab = 'me'; show('game'); render(); }
-  function toHub() { save(); closeModal(); $('profile').classList.remove('open'); startScreen(); }
+  function load(id) { var s = saves()[id]; if (!s) return; S = s; if (!S.d) S.d = S.q * 2 - 1; S.cur = S.log[S.log.length - 1]; if (!S.sched) S.sched = {}; if (!S.own) S.own = { car: null, carVal: 0, gear: 0, homeLvl: 0, pet: null, petAge: 0 }; if (!S.h) S.h = {}; Q = []; tab = 'sched'; setSpeed(0); show('game'); render(); }
+  function toHub() { setSpeed(0); save(); closeModal(); $('profile').classList.remove('open'); startScreen(); }
   function show(id) { ['start', 'game', 'end'].forEach(function (x) { $(x).classList.toggle('hidden', x !== id); }); $('toast').classList.add('hidden'); }
   function yrs(n) { var a = n % 10, b = n % 100; return n + ' ' + (a === 1 && b !== 11 ? 'рік' : a >= 2 && a <= 4 && (b < 12 || b > 14) ? 'роки' : 'років'); }
   function pct(p) { return (p * 100 < 1 && p > 0 ? (p * 100).toFixed(2) : Math.round(p * 100)) + '%'; }
@@ -26,7 +26,10 @@
   // ---------- Тост і модалка ----------
   var toastT;
   function toast(t) { if (!t) return; var el = $('toast'); el.textContent = cur(t); el.classList.remove('hidden'); clearTimeout(toastT); toastT = setTimeout(function () { el.classList.add('hidden'); }, 3200); }
-  function modal(title, bodyHTML, opts) {
+  var modalClosable = false;
+  function modal(title, bodyHTML, opts, closable) {
+    modalClosable = closable !== false;
+    $('mClose').classList.toggle('hidden', !modalClosable);
     $('mTitle').textContent = title; $('mBody').innerHTML = cur(bodyHTML || '');
     var box = $('mOpts'); box.innerHTML = '';
     opts.forEach(function (o) {
@@ -41,21 +44,21 @@
   function closeModal() { $('modal').classList.add('hidden'); }
 
   // Показ підказки рушія (вибір). done() — коли ланцюжок завершився.
-  function prompt(p, done) {
+  function prompt(p, done, closable) {
     modal(p.title || 'Подія', '<p>' + esc(p.text || '') + '</p>', p.opts.map(function (o) {
       return { t: o.t, sub: o.sub, dis: o.dis, f: function () {
         var r = o.f(); normMoney(S);
-        if (r && typeof r === 'object') { prompt(r, done); return; }
+        if (r && typeof r === 'object') { prompt(r, done, closable); return; }
         if (r) { say(S, r, 'me'); toast(r); }
         closeModal(); render(); save(); if (done) done();
       } };
-    }));
+    }), !!closable);
   }
   function runQueue() {
     if (!S.alive) { finish(); return; }
     if (!Q.length) { render(); save(); return; }
     var p = Q.shift();
-    prompt(p, function () { if (!S.alive) { finish(); return; } runQueue(); });
+    prompt(p, function () { if (!S.alive) { finish(); return; } runQueue(); }, false);
   }
 
   // ---------- Старт ----------
@@ -93,7 +96,7 @@
     }
     requestAnimationFrame(drawDots);
   }
-  function born(o) { S = newLife(o); Q = []; tab = 'me'; save(); show('game'); render(); birthCard(); }
+  function born(o) { setSpeed(0); S = newLife(o); Q = []; tab = 'sched'; save(); show('game'); render(); birthCard(); }
   function birthCard() {
     var c = COUNTRIES[S.birth], p = birthOdds(S.birth);
     var body = '<div class="big-flag">' + c.flag + '</div>' +
@@ -149,8 +152,6 @@
     $('hMoneyL').textContent = S.debt > 0 ? 'Борг' : 'Готівка';
     $('hNet').textContent = money(netWorth(S));
     $('bars').innerHTML = bar('Здоровʼя', S.st.health) + bar('Щастя', S.st.happy) + bar('Розум', S.st.smarts) + bar('Харизма', S.st.social);
-    var ap = ''; for (var i = 0; i < apFor(S.age, S); i++) ap += '<i class="' + (i < S.ap ? '' : 'off') + '"></i>';
-    $('ap').innerHTML = ap || '<span class="lbl">ще замалий</span>';
     renderLog(); renderTabs(); renderActs(); renderProfile();
   }
   function renderLog() {
@@ -163,24 +164,46 @@
   }
   function renderTabs() {
     $('tabs').innerHTML = TABS.map(function (t) {
-      var n = availableActions(S, t.id).filter(function (a) { return a.ap > 0 && !S.used[a.id]; }).length;
-      var any = availableActions(S, t.id).length;
+      var any = t.id === 'sched' ? S.age >= 4 : availableActions(S, t.id).length;
       if (!any) return '';
-      return '<button type="button" class="tab' + (t.id === tab ? ' on' : '') + '" data-t="' + t.id + '">' + t.n + (n && S.ap > 0 ? '<span class="dot"></span>' : '') + '</button>';
+      return '<button type="button" class="tab' + (t.id === tab ? ' on' : '') + '" data-t="' + t.id + '">' + t.n + '</button>';
     }).join('');
     Array.prototype.forEach.call($('tabs').querySelectorAll('.tab'), function (b) { b.onclick = function () { tab = b.dataset.t; renderTabs(); renderActs(); }; });
   }
+  function renderSched() {
+    var box = $('acts'), items = schedItems(S), free = freeHours(S);
+    if (S.age < 4 || !items.length) { box.innerHTML = '<div class="none">Поки що твій час розподіляють батьки.</div>'; return; }
+    var head = '<div class="sched-head"><div class="row"><b id="schFree"></b><span id="schRest"></span></div><div class="meter"><i id="schBar"></i></div>' +
+      '<div class="note">' + hoursBreakdown(S).map(function (x) { return x[0] + ' ' + x[1]; }).join(' · ') + ' (год/тиждень)</div></div>';
+    box.innerHTML = head + items.map(function (it) {
+      var v = S.sched[it.id] || 0, d = typeof it.d === 'function' ? it.d(S) : it.d;
+      return '<div class="srow"><div class="srow-t"><b>' + esc(it.n) + '</b><span>' + esc(d || '') + '</span></div><div class="srow-c"><input type="range" id="sr_' + it.id + '" data-id="' + it.id + '" min="0" max="' + it.max + '" step="1" value="' + v + '" aria-label="' + esc(it.n) + ', годин на тиждень"><output id="so_' + it.id + '">' + v + ' год</output></div></div>';
+    }).join('');
+    function upd() { var u = schedUsed(S); $('schFree').textContent = 'Вільно ' + free + ' год/тиждень'; $('schRest').textContent = 'зайнято ' + u + ' · відпочинок ' + Math.max(0, free - u) + (free - u < 4 ? ' — замало!' : ''); $('schBar').style.width = Math.min(100, u / Math.max(1, free) * 100) + '%'; $('schBar').className = free - u < 4 ? 'low' : ''; }
+    upd();
+    Array.prototype.forEach.call(box.querySelectorAll('input[type=range]'), function (r) {
+      r.addEventListener('pointerdown', function () { dragging = true; });
+      r.addEventListener('pointerup', function () { dragging = false; });
+      r.oninput = function () {
+        var id = r.dataset.id, old = S.sched[id] || 0, other = schedUsed(S) - old, nv = +r.value;
+        if (other + nv > free) { nv = Math.max(0, free - other); r.value = nv; }
+        S.sched[id] = nv; $('so_' + id).textContent = nv + ' год'; upd();
+      };
+      r.onchange = function () { dragging = false; save(); };
+    });
+  }
   function renderActs() {
+    if (tab === 'sched') { renderSched(); return; }
     var list = availableActions(S, tab), box = $('acts');
     if (!list.length) { var f = TABS.filter(function (t) { return availableActions(S, t.id).length; })[0]; if (f && f.id !== tab) { tab = f.id; renderTabs(); list = availableActions(S, tab); } }
     if (!list.length) { box.innerHTML = '<div class="none">' + (S.age < 5 ? 'Ти ще зовсім маленьк' + g(S, 'ий', 'а') + '. Просто живи.' : 'Немає доступних дій.') + '</div>'; return; }
     box.innerHTML = '';
     list.forEach(function (a) {
-      var used = a.ap > 0 && S.used[a.id], no = a.ap > S.ap;
+      var used = a.ap > 0 && S.used[a.id];
       var b = document.createElement('button'); b.type = 'button'; b.className = 'act' + (used ? ' done' : '');
-      b.disabled = used || no;
+      b.disabled = used;
       var d = typeof a.d === 'function' ? a.d(S) : a.d;
-      b.innerHTML = '<b>' + esc(a.n) + '</b><span>' + esc(d || '') + '</span><em>' + (used ? '✓' : a.ap ? '●'.repeat(a.ap) : 'вільно') + '</em>';
+      b.innerHTML = '<b>' + esc(a.n) + '</b><span>' + esc(d || '') + '</span><em>' + (used ? '✓ цього року' : a.ap ? 'раз на рік' : '') + '</em>';
       b.onclick = function () { act(a); };
       box.appendChild(b);
     });
@@ -188,7 +211,7 @@
   function act(a) {
     var r = doAction(S, a);
     if (r == null) return;
-    if (typeof r === 'object') { prompt(r, function () { if (!S.alive) finish(); }); render(); return; }
+    if (typeof r === 'object') { prompt(r, function () { if (!S.alive) finish(); }, true); render(); return; }
     say(S, r, 'me'); toast(r); render(); save();
     if (!S.alive) finish();
   }
@@ -237,6 +260,16 @@
     $('profile').innerHTML = cur(h);
   }
 
+  // ---------- Час ----------
+  var speed = 0, acc = 0, lastT = Date.now(), dragging = false, YEAR_MS = { 1: 6000, 2: 3000, 4: 1500 };
+  function setSpeed(v) { speed = v; acc = 0; Array.prototype.forEach.call(document.querySelectorAll('.spd'), function (b) { b.classList.toggle('on', +b.dataset.spd === speed); }); }
+  setInterval(function () {
+    var now = Date.now(), dt = now - lastT; lastT = now;
+    var run = speed && S && S.alive && !$('game').classList.contains('hidden') && $('modal').classList.contains('hidden') && !dragging;
+    if (run) { acc += dt; if (acc >= YEAR_MS[speed]) { acc = 0; nextYear(1); } }
+    $('yrbar').style.width = (speed ? Math.min(100, acc / YEAR_MS[speed] * 100) : 0) + '%';
+  }, 100);
+
   // ---------- Рік ----------
   function nextYear(n) {
     if (!S || !S.alive) return;
@@ -246,8 +279,7 @@
       if (!S.alive || Q.length) break;   // автопауза на виборі чи смерті
     }
     render();
-    if (n > 1 && skipped < n && S.alive) toast('Пауза: подія потребує рішення.');
-    if (!S.alive) { finish(); return; }
+    if (!S.alive) { setSpeed(0); finish(); return; }
     runQueue();
   }
 
@@ -294,11 +326,11 @@
     var body = g2.length ? '<div class="graves">' + g2.slice(0, 50).map(function (x) { return '<div class="grave"><span class="f">' + x.f + '</span><div>' + esc(x.n) + '<small>' + esc(x.c) + ' · ' + esc(x.job || 'без професії') + ' · ' + esc(x.cause) + '</small></div><b>' + x.a + '</b></div>'; }).join('') + '</div>' +
       '<p class="note">Прожито життів: ' + g2.length + ' · країн: ' + Object.keys(g2.reduce(function (m, x) { m[x.c] = 1; return m; }, {})).length + ' · середній вік: ' + Math.round(g2.reduce(function (a, x) { return a + x.a; }, 0) / g2.length) + '</p>'
       : '<p>Тут зʼявляться прожиті життя.</p>';
-    modal('Минулі життя', body, [{ t: 'Закрити', f: closeModal }]);
+    modal('Минулі життя', body, [{ t: 'Назад', f: closeModal }]);
   }
   function statsModal() {
     var gs = store(GKEY) || [];
-    if (!gs.length) { modal('Статистика', '<p>Проживи хоча б одне життя.</p>', [{ t: 'Закрити', f: closeModal }]); return; }
+    if (!gs.length) { modal('Статистика', '<p>Проживи хоча б одне життя.</p>', [{ t: 'Назад', f: closeModal }]); return; }
     var n = gs.length, lived = gs.filter(function (x) { return !x.left; }); if (!lived.length) lived = gs;
     var ages = lived.map(function (x) { return x.a; });
     var avg = Math.round(ages.reduce(function (a, b) { return a + b; }, 0) / ages.length);
@@ -315,7 +347,7 @@
       '<div class="kv"><span>Найкоротше</span><span>' + shortest.f + ' ' + esc(shortest.n) + ', ' + shortest.a + '</span></div>' +
       '<div class="kv"><span>Найбагатше</span><span>' + richest.f + ' ' + esc(richest.n) + ', ' + fmt(richest.peakNet || richest.net || 0) + '</span></div>' +
       '<h3 class="mh">Досягнення за всі життя</h3><div class="ach">' + ACHIEVEMENTS.map(function (a) { var k = achN[a.id] || 0; return '<span class="' + (k ? '' : 'off') + '" title="' + esc(a.d) + '">' + esc(a.n) + (k ? ' ×' + k : '') + '</span>'; }).join('') + '</div>';
-    modal('Статистика всіх життів', body, [{ t: 'Список життів', f: gravesModal }, { t: 'Закрити', f: closeModal }]);
+    modal('Статистика всіх життів', body, [{ t: 'Список життів', f: gravesModal }, { t: 'Назад', f: closeModal }]);
   }
   function menu() {
     modal('Меню', '', [
@@ -329,10 +361,10 @@
         modal('Завершити гру за ' + S.first + '?', '<p>Збереження зникне, а життя потрапить у статистику як завершене достроково.</p>', [
           { t: 'Так, завершити', f: function () { closeModal(); S.left = true; S.cause = 'гру завершено достроково'; S.alive = false; mark(S, 'Гру завершено у ' + S.age + ' р.'); finish(); } },
           { t: 'Ні, грати далі', f: closeModal }]); } },
-      { t: 'Закрити', f: closeModal }]);
+      { t: 'Назад', f: closeModal }]);
   }
   function help() {
-    modal('Як грати', '<p>Кожен рік у тебе є 2–4 очки часу на дії: хобі, навчання, роботу, людей, бізнес. Деякі дії (гроші, звільнення, переїзд від батьків) — вільні.</p>' +
+    modal('Як грати', '<p><b>Час</b> іде сам: ⏸ пауза, 1× — рік за 6 секунд, 2×, 4×; пробіл — пауза/старт. Події з вибором зупиняють час, поки не вирішиш.</p><p><b>Розклад.</b> Щотижня в тебе є вільні години (168 мінус сон, побут, навчання, робота, бізнес, діти, дорога). Розподіли їх між спортом, хобі, мовами, фрилансом, людьми — ефект за рік залежить від годин. Нерозподілене — відпочинок; менше 4 годин відпочинку — вигорання.</p><p><b>Разові дії</b> (пошук роботи, курси, переїзд, покупки) — у вкладках; деякі можна робити раз на рік.</p>' +
       '<p><b>Хобі → професія.</b> Навички ростуть від занять, курсів, менторів. З 35 можна брати фриланс; з певного порогу — йти в професію без диплома. Поріг і заробіток залежать від країни: ринку, міста, англійської.</p>' +
       '<p><b>Бізнес</b> перед відкриттям показує твою підготовку і шанс протриматися 3 роки. Досвід у галузі, профільне хобі і власна участь сильно підвищують шанси.</p>' +
       '<p><b>Дані</b> про країни приблизні (ООН, Світовий банк, ЮНІСЕФ, ~2023). Гроші рахуються в доларах за паритетом купівельної спроможності з урахуванням інфляції; гривні та євро — просто перерахунок за курсом (~45,3 ₴ і ~0,9 € за долар).</p>',
@@ -344,14 +376,16 @@
   $('btnSandbox').onclick = sandbox;
   $('btnGraves').onclick = statsModal;
   $('btnHub').onclick = toHub;
-  $('btnYear').onclick = function () { nextYear(1); };
-  $('btnYear5').onclick = function () { nextYear(5); };
+  $('btnYear').onclick = function () { acc = 0; nextYear(1); };
+  Array.prototype.forEach.call(document.querySelectorAll('.spd'), function (b) { b.onclick = function () { setSpeed(+b.dataset.spd); }; });
+  $('mClose').onclick = function () { if (modalClosable) closeModal(); };
+  $('modal').onclick = function (e) { if (e.target === $('modal') && modalClosable) closeModal(); };
   $('btnMenu').onclick = menu;
   $('btnProfile').onclick = function () { $('profile').classList.toggle('open'); };
   $('profile').onclick = function (e) { if (window.innerWidth <= 1000 && e.target === $('profile')) $('profile').classList.remove('open'); };
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') $('profile').classList.remove('open');
-    if (e.key === ' ' && e.target === document.body && !$('game').classList.contains('hidden') && $('modal').classList.contains('hidden')) { e.preventDefault(); nextYear(1); }
+    if (e.key === 'Escape') { $('profile').classList.remove('open'); if (modalClosable && !$('modal').classList.contains('hidden')) closeModal(); }
+    if (e.key === ' ' && e.target === document.body && !$('game').classList.contains('hidden') && $('modal').classList.contains('hidden')) { e.preventDefault(); setSpeed(speed ? 0 : 1); }
   });
   window.addEventListener('resize', function () { if (!$('start').classList.contains('hidden')) drawDots(); });
   try { var sc = localStorage.getItem('zhereb_cur'); if (sc && CURRENCIES[sc]) CUR = sc; } catch (e) { }

@@ -76,6 +76,7 @@ function newLife(o) {
     year: 2026, birthYear: 2026, age: 0, alive: true, cause: '',
     st: { health: clamp(ri(62, 92) - (c.u5 > 50 ? 8 : 0)), smarts: ri(25, 75), happy: 75, social: ri(30, 70) },
     sk: { music: 0, art: 0, code: 0, write: 0, cook: 0, sport: 0, eng: NATIVE_EN.indexOf(c.code) >= 0 ? 100 : 0, biz: 0, craft: 0 },
+    sched: {}, h: {}, own: { car: null, carVal: 0, gear: 0, homeLvl: 0, pet: null, petAge: 0 },
     lang: {}, credit: 60, record: 0, recordAge: 0, prison: 0, diet: 1, sleep: 1, lowYrs: 0,
     gen: { heart: Math.exp(gauss() * 0.35), cancer: Math.exp(gauss() * 0.35) }, staffAll: 0,
     port: {}, fame: 0, money: 0, debt: 0, inv: { dep: 0, stk: 0, cry: 0 }, home: null, rentals: [], ls: 1, withParents: true,
@@ -446,7 +447,7 @@ function eduTick(s, out) {
   }
   var st = s.study; if (!st) return;
   var working = s.job && !s.job.teen;
-  s.gpa = clamp(s.gpa * 0.55 + 0.45 * (45 + (s.st.smarts - 50) * 0.6 + (s.used.study ? 20 : 0) - (s.used.skip ? 14 : 0) - (working ? (s.job.part ? 6 : 14) : 0) + (s.q - 3) * 2 + rnd(-10, 10)));
+  s.gpa = clamp(s.gpa * 0.55 + 0.45 * (45 + (s.st.smarts - 50) * 0.6 + Math.min(25, (s.h.study || 0) * 2.2) - (working ? (s.job.part ? 6 : 14) : 0) + (s.q - 3) * 2 + rnd(-10, 10)));
   add(s, { smarts: st.t === 'school' ? 1.5 + s.gpa / 100 : 1 + s.gpa / 150 });
   payTuition(s);
   st.left--;
@@ -512,7 +513,7 @@ function familyTick(s) {
   if (s.fam) s.fam *= 1.015 + 0.1 * gauss() + s.econ * 0.08;
   s.parents.forEach(function (p) {
     if (!p.alive) return;
-    p.age++; p.rel = clamp(p.rel - 1.5 + (s.used.parents ? 8 : 0));
+    p.age++; p.rel = clamp(p.rel - 1.5 + (s.h.family || 0) * 2);
     var mod = DEC_MORT[s.d - 1] * (p.ill ? 3 : 1);
     if (chance(hazard(bc, p.age) * mod)) {
       p.alive = false; add(s, { happy: -15 });
@@ -541,7 +542,7 @@ function familyTick(s) {
   var p = s.partner;
   if (p) {
     p.age++; p.yrs++;
-    p.rel = clamp(p.rel - 4 + (s.used.partner ? 11 : 0) + (s.st.happy - 50) / 20 + p.compat / 15 + (s.debt > M(s) ? -3 : 0));
+    p.rel = clamp(p.rel - 4 + (s.h.partner || 0) * 2.2 + (s.st.happy - 50) / 20 + p.compat / 15 + (s.debt > M(s) ? -3 : 0));
     if (p.age >= 65) p.inc *= 0.97;
     if (chance(hazard(c, p.age))) {
       p.alive = false; s.partner = null; add(s, { happy: -25 });
@@ -555,7 +556,7 @@ function familyTick(s) {
   }
   s.kids.forEach(function (k) {
     if (!k.alive) return;
-    k.age++; k.rel = clamp(k.rel - 2 + (s.used.kids ? 9 : 0));
+    k.age++; k.rel = clamp(k.rel - 2 + (s.h.kids || 0) * 2);
     var hz = k.age < 5 ? c.qc * [1.5, 1.2, 1, 0.7, 0.45][Math.min(4, Math.max(0, wealthQ(s) - 1))] : hazard(c, k.age);
     if (chance(hz)) { k.alive = false; add(s, { happy: -30 }); say(s, 'Помер' + gp(k, '', 'ла') + ' ' + gp(k, 'твій син', 'твоя донька') + ' ' + k.name + '. Це найважчий день у твоєму житті.', 'bad'); mark(s, 'Втрата дитини'); return; }
     if (k.age === 18) say(s, gp(k, 'Син', 'Донька') + ' ' + k.name + ' виріс' + gp(k, '', 'ла') + ' і живе окремо.');
@@ -565,11 +566,12 @@ function familyTick(s) {
 function wealthQ(s) { var r = s.hhInc / M(s); return r < 0.4 ? 1 : r < 0.8 ? 2 : r < 1.4 ? 3 : r < 3 ? 4 : 5; }
 
 // ---------- Фінанси ----------
-function finTick(s, ownerPay) {
+function finTick(s, ownerPay, side) {
   var c = C(s), inc = 0;
   var jpG = jobPay(s), jp = jpG * (1 - taxRate(s, jpG)), opG = ownerPay; ownerPay = opG * (1 - taxRate(s, opG) * 0.8);
   s.lastTax = jpG - jp + opG - ownerPay;
-  inc += jp + ownerPay + (s.shadow || 0); s.shadow = 0;
+  side = (side || 0) * (1 - taxRate(s, side) * 0.5);
+  inc += jp + ownerPay + side + (s.shadow || 0); s.shadow = 0;
   if (s.retired) inc += pension(s);
   var adult = s.age >= 18;
   if (adult && !s.job && !s.study && !s.retired && !s.biz.length && c.gdp > 30) inc += c.median * 0.3;
@@ -586,18 +588,20 @@ function finTick(s, ownerPay) {
   // витрати
   var exp = 0;
   if (!adult && s.withParents) {
-    s.money += s.flags.elite ? c.median * 1.5 : c.median * [0.002, 0.004, 0.007, 0.011, 0.016, 0.022, 0.03, 0.042, 0.065, 0.15][s.d - 1];
+    s.money += (s.flags.elite ? c.median * 1.5 : c.median * [0.001, 0.002, 0.0035, 0.005, 0.008, 0.011, 0.015, 0.021, 0.032, 0.07][s.d - 1]) + inc;
   } else {
     var LS = [0.75, 1, 1.7][s.ls];
-    var extra = Math.max(0, inc + pshare - c.median * 1.2) * [0.45, 0.62, 0.85][s.ls];   // з доходом ростуть і витрати
-    exp += (c.median * 0.65 * LS + extra) * (s.withParents ? 0.55 : 1);
+    var extra = Math.max(0, inc + pshare - c.median * 1.2) * [0.6, 0.78, 0.95][s.ls];   // з доходом ростуть і витрати
+    exp += (c.median * 0.76 * LS + extra) * (s.withParents ? 0.55 : 1);
     if (!s.home && !s.withParents && !s.prison) exp += c.median * 0.2 * (c.house / 9) * [0.8, 1, 1.6][s.ls];
     exp *= [0.97, 1, 1.06][s.diet];
     if (s.prison) exp *= 0.2;
+    exp += ownUpkeep(s);
     var kidsHome = s.kids.filter(function (k) { return k.alive && k.age < 18; }).length;
     exp += kidsHome * c.median * 0.13 * (pshare ? 0.6 : 1);
     if (pshare) exp *= 0.85;
   }
+  if (!adult && s.withParents) { inc = 0; pshare = 0; exp = ownUpkeep(s) * 0.5; }
   if (s.debt > 0) {
     var interest = s.debt * 0.13; s.debt += interest;
     var pay = Math.min(s.debt, Math.max(0, s.money + inc + pshare - exp) * 0.5); s.debt -= pay; s.money -= pay;
@@ -606,7 +610,7 @@ function finTick(s, ownerPay) {
   } else if (s.age >= 18) s.credit = clamp(s.credit + 1);
   s.money += inc + pshare - exp;
   if (s.money < 0) { s.debt += -s.money; s.money = 0; }
-  s.lastInc = jp + ownerPay + (s.retired ? pension(s) : 0) + rent; s.hhInc = inc + pshare;
+  s.lastInc = jp + ownerPay + side + (s.retired ? pension(s) : 0) + rent; s.hhInc = inc + pshare;
   s.lastExp = exp;
   if (adult) { s.stat.incSum += s.lastInc; s.stat.incYears++; }
   s.stat.peakInc = Math.max(s.stat.peakInc, s.lastInc);
@@ -621,8 +625,8 @@ function jobTick(s) {
   var j = JOB[s.job.id];
   s.job.yrs++; s.job.lvlYrs++; s.wy[j.id] = (s.wy[j.id] || 0) + 1; s.workYears++;
   var rel = 0; hobbyFor(j.id).forEach(function (k) { s.sk[k] = clamp(s.sk[k] + (s.sk[k] < 70 ? 2 : 0.8)); rel = Math.max(rel, s.sk[k]); });
-  s.job.perf = clamp(s.job.perf * 0.5 + 25 + (s.st.smarts - 50) * 0.3 + rel / 6 + rnd(-12, 12) + (s.used.work ? 18 : 0) - (s.study && !s.job.part ? 8 : 0) + (s.st.health < 35 ? -10 : 0) + (s.sleep ? 0 : 6) - (s.flags.depr ? 10 : 0));
-  if (j.max && s.job.lvl < j.max && s.job.lvlYrs >= 2 && s.job.perf > 62 && chance(0.22 + (s.job.perf - 62) / 60)) {
+  s.job.perf = clamp(s.job.perf * 0.5 + 25 + (s.st.smarts - 50) * 0.3 + rel / 6 + rnd(-12, 12) + (s.h.overtime || 0) * 1.6 - (s.study && !s.job.part ? 8 : 0) + (s.st.health < 35 ? -10 : 0) + (s.sleep ? 0 : 6) - (s.flags.depr ? 10 : 0));
+  if (j.max && s.job.lvl < j.max && s.job.lvlYrs >= 3 && s.job.perf > 65 && chance(0.12 + (s.job.perf - 65) / 80)) {
     s.job.lvl++; s.job.lvlYrs = 0; add(s, { happy: 6 });
     say(s, 'Підвищення! Тепер ти ' + lvName(j, s.job.lvl).toLowerCase() + ' (' + j.n.toLowerCase() + ').', 'good');
     if (s.job.lvl === j.max) mark(s, lvName(j, s.job.lvl) + ' (' + j.n + ')');
@@ -630,7 +634,7 @@ function jobTick(s) {
   if (j.vol) {
     var sk = j.vol === 'social' ? s.st.social : s.sk[j.vol];
     var jump = chance(0.02 + sk / 2500) ? 20 : 0;
-    s.fame = clamp(s.fame + (sk - 55) / 8 + rnd(-4, 6) + jump + (s.used.work ? 4 : 0));
+    s.fame = clamp(s.fame + (sk - 55) / 8 + rnd(-4, 6) + jump + (s.h.overtime || 0) * 0.3);
     if (jump) say(s, 'Прорив! Про тебе заговорили — слава зросла.', 'good');
     if (s.fame >= 80 && !s.flags.star) { s.flags.star = 1; mark(s, 'Знаменитість'); say(s, 'Тебе впізнають на вулиці. Ти — зірка.', 'big'); }
   }
@@ -644,13 +648,13 @@ function jobTick(s) {
 // ---------- Показники ----------
 function statsTick(s) {
   var c = C(s);
-  var target = expH(s.age) + [-5, 0, 4][s.diet] - (s.sleep ? 0 : 4) - (s.flags.depr ? 4 : 0) + (s.used.sport ? 7 : 0) + (s.ls === 2 ? 2 : s.ls === 0 ? -2 : 0) - (s.flags.smoker ? 7 : 0) - (s.flags.drink ? 5 : 0) + (s.age >= 18 && s.hhInc < c.median * 0.5 ? -4 : 0) + (c.gdp > 30 ? 2 : 0);
+  var target = expH(s.age) + [-5, 0, 4][s.diet] - (s.sleep ? 0 : 4) - (s.flags.depr ? 4 : 0) + Math.min(12, (s.h.sport || 0) * 1.5) + OWN_HEALTH(s) + (s.ls === 2 ? 2 : s.ls === 0 ? -2 : 0) - (s.flags.smoker ? 7 : 0) - (s.flags.drink ? 5 : 0) + (s.age >= 18 && s.hhInc < c.median * 0.5 ? -4 : 0) + (c.gdp > 30 ? 2 : 0);
   s.st.health = clamp(s.st.health + (target - s.st.health) * (0.14 + 0.1 * c.hq) + rnd(-2, 2));
   if (s.age > 65) add(s, { smarts: -0.5 });
   if (s.age < 18 && !s.study) add(s, { smarts: 0.6 });
-  s.st.social = clamp(s.st.social + ((35 + Math.min(6, s.friends) * 6) - s.st.social) * 0.08 + (s.used.friends ? 2 : 0));
-  if (s.friends > 0 && !s.used.friends && chance(0.1)) { s.friends--; }
-  if (!(s.job && JOB[s.job.id] && JOB[s.job.id].vol) && !s.used.blog) s.fame *= 0.93;
+  s.st.social = clamp(s.st.social + ((35 + Math.min(6, s.friends) * 6) - s.st.social) * 0.08 + ownSocial(s) * 0.1);
+  if (s.friends > 0 && (s.h.friends || 0) < 2 && chance(0.12)) { s.friends--; }
+  if (!(s.job && JOB[s.job.id] && JOB[s.job.id].vol) && !(s.h.blog > 0)) s.fame *= 0.93;
   if (s.flags.smoker && s.age > 25 && s.used.quitsmoke) { }
   // щастя
   var t = 52;
@@ -666,6 +670,7 @@ function statsTick(s) {
   }
   t += (s.st.health - 60) / 5 + (s.friends > 0 ? Math.min(5, s.friends) * 1.5 : -5) - cf(s) * 5 + (s.immigrant && s.immYrs < 3 ? -5 : 0);
   s.kids.forEach(function (k) { if (k.alive) t += 2; });
+  t += ownHappy(s);
   if (s.prison) t -= 15;
   if (s.flags.depr) t -= 10;
   if (!s.sleep) t -= 3;
@@ -697,7 +702,7 @@ function deathCheck(s) {
     if (s.flags.ill) mod *= s.flags.illTreated ? 1.4 : 2.5;
     mod = clamp(mod, 0.35, 6);
     mod *= 1 + cf(s) * 0.1;
-    q = hazard(c, s.age) * mod * 0.8;
+    q = hazard(c, s.age) * mod * 0.52;
   }
   if (chance(q)) { die(s, deathCause(s)); return true; }
   return false;
@@ -747,13 +752,14 @@ function ageUp(s) {
   if (deathCheck(s)) { s.log.push(s.cur); return out; }
   s.age++; s.year++;
   s.log.push(s.cur);
+  var side = schedTick(s);
   worldTick(s);
   familyTick(s);
   eduTick(s, out);
   jobTick(s);
   gangTick(s, out);
   var op = bizTick(s, out);
-  finTick(s, op);
+  finTick(s, op, side);
   statsTick(s);
   langTick(s);
   prisonTick(s, out);
@@ -765,6 +771,8 @@ function ageUp(s) {
   pickEvents(s, out);
   if (s.st.health <= 0) die(s, 'виснаження організму');
   mentalTick(s);
+  ownTick(s);
+  schedDefaults(s); schedFit(s);
   s.used = {}; s.ap = apFor(s.age, s);
   return out;
 }
@@ -786,8 +794,23 @@ function illnessPrompt(s) {
 }
 function getIll(s, name) { if (s.flags.ill) return; s.flags.ill = true; s.flags.illName = name; s.flags.illKnown = false; s.flags.illTreated = false; }
 
+// ---------- Майно: транспорт, речі, облаштування дому, тварини ----------
+function vehicle(s) { return s.own && s.own.car ? VEHICLE[s.own.car] : null; }
+function OWN_HEALTH(s) { var o = s.own || {}, v = vehicle(s); return (v ? v.health || 0 : 0) + HOME_LV[o.homeLvl || 0].health + (o.pet === 'dog' ? 2 : o.pet ? 1 : 0); }
+function ownHappy(s) { var o = s.own || {}, v = vehicle(s); return (v ? v.hap : 0) + GEAR_LV[o.gear || 0].hap + HOME_LV[o.homeLvl || 0].hap + (o.pet ? 4 : 0); }
+function ownSocial(s) { var o = s.own || {}, v = vehicle(s); return (v ? v.soc : 0) + GEAR_LV[o.gear || 0].soc; }
+function ownUpkeep(s) { var o = s.own || {}, c = C(s), v = vehicle(s), u = 0; if (v) u += v.up * c.median; u += GEAR_LV[o.gear || 0].p * c.median * 0.12; u += HOME_LV[o.homeLvl || 0].p * c.median * 0.03; if (o.pet) u += c.median * 0.04; return u; }
+function ownTick(s) {
+  var o = s.own; if (!o) return;
+  if (o.car) { o.carVal *= 0.87; if (chance(0.01)) { add(s, { health: -8 }); say(s, 'Невелика аварія на ' + VEHICLE[o.car].n.toLowerCase() + 'і. Обійшлося синцями.', 'bad'); } }
+  if (o.pet) { o.petAge++; if (o.petAge > ri(11, 16)) { say(s, 'Помер' + (o.pet === 'dog' ? ' твій пес' : 'ла твоя кішка') + '. Він' + (o.pet === 'dog' ? '' : 'а') + ' був' + (o.pet === 'dog' ? '' : 'а') + ' частиною родини.', 'bad'); add(s, { happy: -10 }); o.pet = null; o.petAge = 0; } }
+  if (s.debt > M(s) * 3 && (o.gear > 0) && chance(0.3)) { o.gear--; say(s, 'Через борги довелося продати частину дорогих речей.', 'bad'); }
+}
+
 // ---------- Організована злочинність ----------
 var NARCO = ['MX', 'CO', 'PE', 'BR', 'AF', 'MM', 'HT', 'NG'];
+var CARTEL = ['MX', 'CO'];   // найбільші картельні країни: нелегальне тут живе вільніше
+function cartel(s) { return CARTEL.indexOf(s.country) >= 0; }
 var GANG_RANK = ['Шістка', 'Боєць', 'Бригадир', 'Лейтенант', 'Бос'];
 var GANG_PAY = [0.8, 2, 5, 15, 60];
 function gangKind(s) { return NARCO.indexOf(s.country) >= 0 ? 'картель' : C(s).law < 0.5 ? 'угруповання' : 'банда'; }
@@ -795,15 +818,15 @@ function gangOK(s) { return s.age >= 15 && s.age <= 45 && s.urban && !s.gang && 
 function gangRisk(s) {
   var g2 = s.gang, c = C(s), narco = NARCO.indexOf(s.country) >= 0;
   return {
-    death: [0.012, 0.02, 0.03, 0.04, 0.05][g2.rank] * (narco ? 1.8 : 1) * (s.gangWar ? 2.5 : 1) * (s.used.lowkey ? 0.6 : 1),
-    arrest: clamp((0.03 + g2.rank * 0.015 + (g2.heat || 0) * 0.03) * (0.15 + c.law * 1.2) * (s.used.bribe ? 0.35 : 1) * (s.used.lowkey ? 0.6 : 1), 0.005, 0.8)
+    death: [0.012, 0.02, 0.03, 0.04, 0.05][g2.rank] * (narco ? (cartel(s) ? 1.5 : 1.8) : 1) * (s.gangWar ? 2.5 : 1) * (s.used.lowkey ? 0.6 : 1),
+    arrest: clamp((0.03 + g2.rank * 0.015 + (g2.heat || 0) * 0.03) * (0.15 + c.law * 1.2) * (s.used.bribe ? 0.35 : 1) * (s.used.lowkey ? 0.6 : 1) * (cartel(s) ? 0.4 : 1), 0.004, 0.8)
   };
 }
 function gangTick(s, out) {
   var g2 = s.gang; if (!g2 || s.prison) return;
   var c = C(s), narco = NARCO.indexOf(s.country) >= 0, r = gangRisk(s);
   g2.yrs++;
-  var inc = c.median * GANG_PAY[g2.rank] * (narco ? 3 : 1) * rnd(0.5, 1.5) * (s.used.job_gang ? 1.5 : 1) * (s.used.lowkey ? 0.5 : 1);
+  var inc = c.median * GANG_PAY[g2.rank] * (narco ? 3 : 1) * (cartel(s) ? 1.3 : 1) * rnd(0.5, 1.5) * (s.used.job_gang ? 1.5 : 1) * (s.used.lowkey ? 0.5 : 1);
   if (g2.rank === 4 && narco && chance(0.06)) { inc *= 10; say(s, 'Канал поставок розширився на інші країни — гроші течуть рікою.', 'big'); }
   s.shadow = (s.shadow || 0) + inc;
   g2.perf = clamp(g2.perf * 0.5 + 25 + (s.st.smarts - 50) * 0.2 + s.sk.sport / 8 + (s.st.social - 50) * 0.2 + (s.used.job_gang ? 15 : 0) + rnd(-10, 10));
@@ -812,7 +835,7 @@ function gangTick(s, out) {
   if (chance(r.death)) { die(s, pick(['загинув' + g(s, '', 'ла') + ' у розборках', 'вбивство конкурентами', 'перестрілка з поліцією'])); return; }
   if (chance(r.arrest)) {
     out.push({ title: 'Арешт', text: 'Тебе затримали. ' + (c.law < 0.5 ? 'Суд у цій країні можна «переконати».' : 'Справа серйозна.'), opts: [
-      { t: 'Відкупитися', sub: '~' + fmt(c.median * (3 + g2.rank * 8)) + ' · шанс ' + Math.round(clamp(1 - c.law * 1.1, 0.05, 0.85) * 100) + '%', dis: s.money < c.median * (3 + g2.rank * 8), f: function () { s.money -= c.median * (3 + g2.rank * 8); if (chance(clamp(1 - c.law * 1.1, 0.05, 0.85))) { g2.heat = 0; return 'Справу «загубили». Ти на волі.'; } return busted2(s); } },
+      { t: 'Відкупитися', sub: '~' + fmt(c.median * (3 + g2.rank * 8) * (cartel(s) ? 0.6 : 1)) + ' · шанс ' + Math.round(clamp(1 - c.law * 1.1 + (cartel(s) ? 0.2 : 0), 0.05, 0.92) * 100) + '%', dis: s.money < c.median * (3 + g2.rank * 8) * (cartel(s) ? 0.6 : 1), f: function () { s.money -= c.median * (3 + g2.rank * 8) * (cartel(s) ? 0.6 : 1); if (chance(clamp(1 - c.law * 1.1 + (cartel(s) ? 0.2 : 0), 0.05, 0.92))) { g2.heat = 0; return 'Справу «загубили». Ти на волі.'; } return busted2(s); } },
       { t: 'Мовчати й чекати адвоката', f: function () { return busted2(s); } }] });
     return;
   }

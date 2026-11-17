@@ -346,3 +346,26 @@ var HOBBY = {
 };
 
 var EMIGRATE_TO =['PL', 'DE', 'GB', 'US', 'CA', 'AU', 'SE', 'FR', 'ES', 'IT', 'JP', 'KR', 'SA'];
+
+// Майно. p — ціна (× медіанний річний дохід країни), up — утримання на рік, hap/soc — щастя і статус, health — вплив на здоровʼя.
+var VEHICLES = [
+  { id: 'bike', n: 'Велосипед', p: 0.06, up: 0.01, hap: 2, soc: 0, health: 2 },
+  { id: 'scooter', n: 'Скутер', p: 0.25, up: 0.04, hap: 3, soc: 1 },
+  { id: 'usedcar', n: 'Вживане авто', p: 0.8, up: 0.12, hap: 4, soc: 2 },
+  { id: 'car', n: 'Нове авто', p: 2, up: 0.2, hap: 6, soc: 4 },
+  { id: 'premium', n: 'Преміум-авто', p: 5, up: 0.45, hap: 8, soc: 8 },
+  { id: 'supercar', n: 'Спорткар', p: 12, up: 1, hap: 10, soc: 12 }
+];
+var VEHICLE = {}; VEHICLES.forEach(function (v) { VEHICLE[v.id] = v; });
+var GEAR_LV = [
+  { n: 'Базові речі', p: 0, hap: 0, soc: 0 },
+  { n: 'Добрий одяг і гаджети', p: 0.3, hap: 2, soc: 2 },
+  { n: 'Дорогі бренди', p: 1.2, hap: 4, soc: 5 },
+  { n: 'Люкс: годинники, прикраси, дизайнерський одяг', p: 4, hap: 6, soc: 9 }
+];
+var HOME_LV = [
+  { n: 'Мінімум', p: 0, hap: 0, health: 0 },
+  { n: 'Затишно: нормальні меблі й техніка', p: 0.4, hap: 3, health: 1 },
+  { n: 'Гарний ремонт', p: 1.5, hap: 6, health: 2 },
+  { n: 'Дизайнерський інтерʼєр', p: 5, hap: 9, health: 2 }
+];

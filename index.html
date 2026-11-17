@@ -45,7 +45,7 @@
         <div><span class="lbl">Статок</span><span id="hNet" class="num"></span></div>
       </div>
       <button class="btn small ghost" id="btnHub" type="button" title="Зберегти і вийти в хаб">Хаб</button>
-      <button class="btn small ghost" id="btnProfile" type="button">Профіль</button>
+      <button class="btn small ghost" id="btnProfile" type="button" aria-label="Профіль" title="Профіль">👤</button>
       <button class="btn small ghost" id="btnMenu" type="button" aria-label="Меню">☰</button>
     </header>
 
@@ -58,10 +58,18 @@
       </main>
 
       <aside class="panel actions">
-        <div class="ap-row"><span class="lbl">Час цього року</span><span id="ap" class="ap"></span></div>
         <nav class="tabs" id="tabs"></nav>
         <div class="acts" id="acts"></div>
-        <div class="yr-btns"><button id="btnYear5" class="btn ghost" type="button" title="Зупиниться, якщо трапиться подія з вибором">+5 років</button><button id="btnYear" class="btn primary big" type="button">Прожити рік →</button></div>
+        <div class="clock">
+          <div class="yrbar" aria-hidden="true"><i id="yrbar"></i></div>
+          <div class="speeds" role="group" aria-label="Швидкість часу">
+            <button type="button" class="spd" data-spd="0" title="Пауза (пробіл)" aria-label="Пауза">❚❚</button>
+            <button type="button" class="spd" data-spd="1" title="1 рік за 6 секунд">1×</button>
+            <button type="button" class="spd" data-spd="2" title="1 рік за 3 секунди">2×</button>
+            <button type="button" class="spd" data-spd="4" title="1 рік за 1,5 секунди">4×</button>
+            <button id="btnYear" class="btn primary" type="button" title="Прожити рівно один рік">+1 рік</button>
+          </div>
+        </div>
       </aside>
     </div>
   </section>
@@ -73,6 +81,7 @@
 <!-- Модальне вікно -->
 <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="mTitle">
   <div class="sheet">
+    <button id="mClose" class="mclose hidden" type="button" aria-label="Закрити вікно">✕</button>
     <h2 id="mTitle"></h2>
     <div id="mBody"></div>
     <div id="mOpts" class="opts"></div>
@@ -84,6 +93,7 @@
 <script src="js/engine.js"></script>
 <script src="js/actions.js"></script>
 <script src="js/events.js"></script>
+<script src="js/schedule.js"></script>
 <script src="js/ui.js"></script>
 </body>
 </html>
