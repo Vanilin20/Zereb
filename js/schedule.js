@@ -5,23 +5,23 @@ var SCHED = [];
 function S_(o) { o.max = o.max || 20; SCHED.push(o); }
 function hobbyGain(s, v, h, talent) { return h * 1.2 * Math.max(0.05, 1 - v / 110) * (talent || 1) * (0.7 + s.st.smarts / 170); }
 
-S_({ id: 'sport', n: 'Спорт', age: 5, prisonOk: 1, d: 'Здоровʼя, навичка «Спорт»' });
-S_({ id: 'read', n: 'Читання', age: 6, prisonOk: 1, d: 'Розум, трохи письма' });
-S_({ id: 'study', n: 'Додаткове навчання', age: 6, show: function (s) { return !!s.study; }, d: 'Вищий бал, менше щастя' });
+S_({ grp: 'body', id: 'sport', n: 'Спорт', age: 5, prisonOk: 1, d: 'Здоровʼя, навичка «Спорт»' });
+S_({ grp: 'body', id: 'read', n: 'Читання', age: 6, prisonOk: 1, d: 'Розум, трохи письма' });
+S_({ grp: 'body', id: 'study', n: 'Додаткове навчання', age: 6, show: function (s) { return !!s.study; }, d: 'Вищий бал, менше щастя' });
 HOBBY_ACT.forEach(function (h) {
-  S_({ id: 'h_' + h[0], skill: h[0], n: h[1], age: h[2], prisonOk: h[0] !== 'code' && h[0] !== 'cook', d: h[3],
+  S_({ grp: 'skill', id: 'h_' + h[0], skill: h[0], n: h[1], age: h[2], prisonOk: h[0] !== 'code' && h[0] !== 'cook', d: h[3],
     show: function (s) { return !(h[0] === 'eng' && s.sk.eng >= 100); } });
 });
-S_({ id: 'lang', n: 'Іноземна мова', age: 8, prisonOk: 1, d: function (s) { return s.langTarget ? LANG_NAMES[s.langTarget] + ' ' + Math.round(s.lang[s.langTarget] || 0) + ' · змінити — у вкладці «Хобі»' : 'Обери мову у вкладці «Хобі»'; }, show: function (s) { return !!s.langTarget; } });
-S_({ id: 'free', n: 'Фриланс', age: 14, max: 30, d: function (s) { var k = s.freeSkill; return k ? HOBBY[k].free + ' · ~' + fmt(freelancePay(s, k) / 10) + ' за год/тиждень на рік' : ''; }, show: function (s) { return !!s.freeSkill && s.sk[s.freeSkill] >= 35; } });
-S_({ id: 'teen', n: 'Підробіток', age: 13, d: function (s) { return '~' + fmt(M(s) * 0.004) + ' на рік за кожну годину на тиждень'; }, show: function (s) { return s.age < 18; } });
-S_({ id: 'overtime', n: 'Понаднормова робота', max: 25, d: 'Продуктивність і шанс підвищення ↑, оплата ×1,5; здоровʼя ↓', show: function (s) { return s.job && !s.job.teen; } });
-S_({ id: 'friends', n: 'Друзі', age: 4, prisonOk: 1, d: function (s) { return 'Харизма, щастя · друзів: ' + s.friends; } });
-S_({ id: 'family', n: 'Батьки й рідні', age: 3, d: 'Стосунки з батьками', show: function (s) { return s.parents.some(function (p) { return p.alive; }); } });
-S_({ id: 'partner', n: 'Партнер', d: function (s) { return s.partner ? s.partner.name + ' · стосунки ' + Math.round(s.partner.rel) : ''; }, show: function (s) { return !!s.partner; } });
-S_({ id: 'kids', n: 'Діти', d: 'Стосунки з дітьми', show: function (s) { return s.kids.some(function (k) { return k.alive && k.age < 25; }); } });
-S_({ id: 'volunteer', n: 'Волонтерство', age: 12, d: 'Щастя, харизма, нові знайомі' });
-S_({ id: 'blog', n: 'Блог', age: 12, d: 'Слава, харизма', show: function (s) { return C(s).gdp > 2; } });
+S_({ grp: 'skill', id: 'lang', n: 'Іноземна мова', age: 8, prisonOk: 1, d: function (s) { return s.langTarget ? LANG_NAMES[s.langTarget] + ' ' + Math.round(s.lang[s.langTarget] || 0) + ' · змінити — у вкладці «Хобі»' : 'Обери мову у вкладці «Хобі»'; }, show: function (s) { return !!s.langTarget; } });
+S_({ grp: 'earn', id: 'free', n: 'Фриланс', age: 14, max: 30, d: function (s) { var k = s.freeSkill; return k ? HOBBY[k].free + ' · ~' + fmt(freelancePay(s, k) / 10) + ' за год/тиждень на рік' : ''; }, show: function (s) { return !!s.freeSkill && s.sk[s.freeSkill] >= 35; } });
+S_({ grp: 'earn', id: 'teen', n: 'Підробіток', age: 13, d: function (s) { return '~' + fmt(M(s) * 0.004) + ' на рік за кожну годину на тиждень'; }, show: function (s) { return s.age < 18; } });
+S_({ grp: 'earn', id: 'overtime', n: 'Понаднормова робота', max: 25, d: 'Продуктивність і шанс підвищення ↑, оплата ×1,5; здоровʼя ↓', show: function (s) { return s.job && !s.job.teen; } });
+S_({ grp: 'people', id: 'friends', n: 'Друзі', age: 4, prisonOk: 1, d: function (s) { return 'Харизма, щастя · друзів: ' + s.friends; } });
+S_({ grp: 'people', id: 'family', n: 'Батьки й рідні', age: 3, d: 'Стосунки з батьками', show: function (s) { return s.parents.some(function (p) { return p.alive; }); } });
+S_({ grp: 'people', id: 'partner', n: 'Партнер', d: function (s) { return s.partner ? s.partner.name + ' · стосунки ' + Math.round(s.partner.rel) : ''; }, show: function (s) { return !!s.partner; } });
+S_({ grp: 'people', id: 'kids', n: 'Діти', d: 'Стосунки з дітьми', show: function (s) { return s.kids.some(function (k) { return k.alive && k.age < 25; }); } });
+S_({ grp: 'people', id: 'volunteer', n: 'Волонтерство', age: 12, d: 'Щастя, харизма, нові знайомі' });
+S_({ grp: 'people', id: 'blog', n: 'Блог', age: 12, d: 'Слава, харизма', show: function (s) { return C(s).gdp > 2; } });
 
 function schedItems(s) { return SCHED.filter(function (it) { return s.age >= (it.age || 16) && (!s.prison || it.prisonOk) && (!it.show || it.show(s)); }); }
 function freeHours(s) {
@@ -33,10 +33,18 @@ function freeHours(s) {
   if (s.job) h -= s.job.teen ? 0 : s.job.part ? 20 : 40;
   s.biz.forEach(function (b) { h -= b.mgr ? 4 : b.effort >= 1 ? 45 : 22; });
   if (s.gang) h -= 15;
+  h -= chores(s);
   var small = s.kids.filter(function (k) { return k.alive && k.age < 12; }).length;
   h -= Math.min(24, small * 8) * (s.partner ? 0.6 : 1);
   if (s.job || s.study) h -= s.own && s.own.car ? 3 : s.urban ? 7 : 5;
   return Math.max(0, Math.round(h));
+}
+// Обовʼязки, яких не уникнути: допомога вдома в бідних родинах, догляд за хворими батьками
+function chores(s) {
+  var c = C(s), h = 0;
+  if (s.age >= 6 && s.age < 18 && s.withParents) h += s.d <= 3 && c.gdp < 15 ? (s.urban ? 8 : 14) : s.d <= 5 ? 4 : 2;
+  if (s.age >= 18 && s.parents.some(function (p) { return p.alive && (p.ill || p.age >= 82); })) h += 8;
+  return h;
 }
 function schedUsed(s) { var t = 0; schedItems(s).forEach(function (it) { t += s.sched[it.id] || 0; }); return t; }
 // Підрізати розклад, якщо вільного часу стало менше
@@ -104,8 +112,11 @@ function hoursBreakdown(s) {
   if (s.job && !s.job.teen) r.push(['робота', s.job.part ? 20 : 40]);
   var bz = 0; s.biz.forEach(function (b) { bz += b.mgr ? 4 : b.effort >= 1 ? 45 : 22; }); if (bz) r.push(['бізнес', bz]);
   if (s.gang) r.push(['угруповання', 15]);
+  var ch = chores(s); if (ch) r.push([s.age < 18 ? 'допомога вдома' : 'догляд за батьками', ch]);
   var small = s.kids.filter(function (k) { return k.alive && k.age < 12; }).length; if (small) r.push(['малі діти', Math.round(Math.min(24, small * 8) * (s.partner ? 0.6 : 1))]);
   if (s.job || s.study) r.push(['дорога', s.own && s.own.car ? 3 : s.urban ? 7 : 5]);
   return r;
 }
 TABS.unshift({ id: 'sched', n: 'Розклад' });
+
+var SCHED_GROUPS = [['body', 'Тіло й розум'], ['skill', 'Навички й мови'], ['earn', 'Додатковий заробіток'], ['people', 'Люди']];

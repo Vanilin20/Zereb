@@ -48,7 +48,7 @@ ev('sportclub', [7, 14], 2, null, function (s) {
     O('Не хочу', function () { return 'Спорт — не твоє.'; })] };
 }, true);
 ev('childlabor', [8, 14], 4, function (s) { return s.q <= 2 && poor(s) && !!s.study; }, function (s) {
-  return { text: 'Родині бракує грошей. Батьки просять тебе ' + pick(['працювати в полі', 'торгувати на ринку', 'доглядати худобу', 'носити воду й дрова']) + ' замість школи.', opts: [
+  return { text: 'Родині бракує грошей. Батьки просять тебе ' + pick(['працювати в полі', 'торгувати на ринку', 'доглядати худобу', 'носити воду й дрова']) + ' замість школи. (Факт: ≈160 млн дітей у світі працюють — ILO/UNICEF, 2020.)', opts: [
     O('Допомагати родині', function () { s.money += M(s) * 0.05; s.parents.forEach(function (p) { p.rel += 8; }); if (chance(.5)) { s.study = null; mark(s, 'Покинув' + g(s, '', 'ла') + ' школу заради роботи'); return 'Ти покинув' + g(s, '', 'ла') + ' школу, щоб працювати. Родина вдячна.'; } add(s, { gpa: -15 }); return 'Ти працюєш і ходиш до школи через день.'; }),
     O('Наполягти на школі', function () { s.parents.forEach(function (p) { p.rel -= 10; }); add(s, { happy: -3, gpa: 5 }); return 'Ти відстояв' + g(s, '', 'ла') + ' своє право вчитися.'; })] };
 });
@@ -84,7 +84,7 @@ ev('crush', [12, 17], 4, null, function (s) {
     O('Мовчати', function () { add(s, { happy: -2 }); return 'Ти так і не наважи' + g(s, 'вся', 'лася') + '.'; })] };
 }, true);
 ev('smoke', [13, 20], 3, function (s) { return !s.flags.smoker && !s.flags.nosmoke; }, function (s) {
-  return { text: 'Друзі за школою пропонують закурити.', opts: [
+  return { text: 'Друзі за школою пропонують закурити. (Факт: тютюн щороку вбиває понад 8 млн людей — WHO.)', opts: [
     O('Спробувати', function () { if (chance(.5)) { s.flags.smoker = 1; return 'Одна сигарета — і звичка. Тепер ти куриш.'; } return 'Гидко. Більше не хочеться.'; }, 'може стати звичкою'),
     O('Відмовитися', function () { s.flags.nosmoke = 1; add(s, { social: -1 }); return 'Ти відмови' + g(s, 'вся', 'лася') + '.'; })] };
 });
@@ -162,7 +162,7 @@ ev('relocate', [25, 50], 2, function (s) { var j = s.job && JOB[s.job.id]; retur
 });
 ev('inherit', [20, 70], 0.4, null, function (s) { var v = M(s) * rnd(0.3, 3); s.money += v; return 'Далека родичка залишила тобі спадок: ' + fmt(v) + '.'; }, true);
 ev('lottery', [18, 90], 0.15, null, function (s) { var v = M(s) * rnd(20, 100); s.money += v; mark(s, 'Виграш у лотерею'); return 'Ти виграв' + g(s, '', 'ла') + ' у лотерею ' + fmt(v) + '!'; }, true);
-ev('crash', [16, 85], function (s) { return C(s).gdp < 20 ? 0.6 : 0.3; }, null, function (s) { var h = ri(8, 30); add(s, { health: -h }); var cost = M(s) * 0.1; s.money -= cost; if (h > 27 && chance(.04)) { die(s, 'ДТП'); return null; } return 'Ти потрапив' + g(s, '', 'ла') + ' у ДТП. ' + (h > 20 ? 'Довгі місяці лікування.' : 'Відбув' + g(s, 'ся', 'лася') + ' синцями.'); });
+ev('crash', [16, 85], function (s) { return C(s).gdp < 20 ? 0.6 : 0.3; }, null, function (s) { var h = ri(8, 30); add(s, { health: -h }); var cost = M(s) * 0.1; s.money -= cost; if (h > 27 && chance(.04)) { die(s, 'ДТП'); return null; } return 'Ти потрапив' + g(s, '', 'ла') + ' у ДТП. ' + (h > 20 ? 'Довгі місяці лікування.' : 'Відбув' + g(s, 'ся', 'лася') + ' синцями.') + ' (Факт: у ДТП щороку гинуть ≈1,19 млн людей — WHO, 2023.)'; });
 ev('robbed', [14, 80], function (s) { return C(s).gdp < 15 ? 1.2 : 0.4; }, null, function (s) { var l = Math.min(s.money, M(s) * rnd(0.03, 0.2)); s.money -= l; add(s, { happy: -6 }); return 'Тебе пограбували на вулиці' + (l > 1 ? ', забрали ' + fmt(l) : '') + '.'; });
 ev('flood', [0, 90], function (s) { return ['BD', 'PH', 'ID', 'PK', 'IN', 'MM', 'VN', 'MZ', 'MG', 'NG', 'HT', 'CN'].indexOf(s.country) >= 0 ? 1.5 : 0.3; }, null, function (s) {
   var d = pick(['Повінь затопила', 'Тайфун зруйнував', 'Землетрус пошкодив', 'Буревій зніс дах на']);
@@ -395,3 +395,51 @@ ev('gang_betray', [16, 70], 2, function (s) { return s.gang && s.gang.rank >= 2;
     O('Погодитися', function () { s.gangPast = s.gang; s.gang = null; if (chance(0.25)) { die(s, 'помста за зраду'); return 'Тебе знайшли.'; } s.heat = 0; mark(s, 'Свідок обвинувачення'); return 'Ти дав' + g(s, '', 'ла') + ' свідчення. Нове імʼя, нове місто.'; }, 'ризик помсти'),
     O('Відмовитися', function () { if (s.gang) s.gang.perf += 10; return 'Ти не зраджуєш своїх.'; })] };
 });
+
+
+// ---------- Повсякденний реалізм: маленькі сцени з контекстом країни ----------
+var tropical = function (s) { return ['NG', 'CD', 'ET', 'TZ', 'UG', 'KE', 'AO', 'NE', 'MZ', 'GH', 'CM', 'ML', 'MG', 'SD', 'HT'].indexOf(s.country) >= 0; };
+ev('water', [4, 15], 4, function (s) { return C(s).gdp < 6 && !s.urban && s.d <= 5; }, function (s) { add(s, { happy: -2, health: -1, sport: 1 }); return 'Щоранку ти ходиш по воду до колонки за кілометр — ще до сходу сонця. (Факт: ≈2,2 млрд людей не мають безпечної питної води вдома — WHO/UNICEF, 2022.)'; });
+ev('nolight', [6, 18], 3, function (s) { return C(s).gdp < 5 && s.d <= 6; }, function (s) { add(s, { gpa: -3 }); return 'Вдома немає електрики: уроки — при ліхтарику, поки не сяде батарейка. (Факт: ≈685 млн людей живуть без електрики — IEA/World Bank, 2022.)'; });
+ev('mosquito', [0, 10], 3, tropical, function (s) {
+  return { text: 'Сезон дощів — і хмари комарів. (Факт: малярія щороку забирає ≈600 тис. життів, переважно дітей в Африці — WHO.)', opts: [
+    O('Витратитися на москітну сітку', function () { s.money -= M(s) * 0.01; s.flags.net = 1; return 'Тепер спиш під сіткою.'; }, '~' + fmt(M(s) * 0.01)),
+    O('Обійдемося', function () { if (chance(0.35)) { add(s, { health: -15 }); return 'Малярія. Важкі тижні з лихоманкою.'; } return 'Цього разу пронесло.'; })] };
+}, true);
+ev('ball', [5, 11], 3, function (s) { return C(s).gdp < 8; }, function (s) { add(s, { happy: 4, sport: 3, social: 2 }); return 'Ви з дітьми з вулиці зробили мʼяч із пакетів і мотузки — і грали до темряви.'; });
+ev('airraid', [0, 90], 6, function (s) { return s.country === 'UA' && cf(s) === 2; }, function (s) { add(s, { happy: -3, health: -1 }); return pick(['Повітряна тривога вночі — знову коридор і «правило двох стін».', 'Графіки відключень: працюєш і вчишся під генератор.', 'Зранку новини з рідного міста. Цілий день тримає тривога.', 'Школа знову онлайн через тривоги.']); });
+ev('unexp', [18, 95], 6, function (s) { return !s.withParents; }, function (s) {
+  var x = pick([['зламалася пральна машина', 0.04], ['розбився телефон', 0.03], ['стоматолог', 0.05], ['ремонт даху/сантехніки', 0.08], ['штраф за паркування', 0.01], ['подорожчала оренда', 0.06], ['ліки для родини', 0.04]]);
+  var cost = M(s) * x[1] * rnd(0.7, 1.4); s.money -= cost; return 'Непередбачені витрати: ' + x[0] + ' — ' + fmt(cost) + '.';
+});
+ev('rentup', [18, 70], 2, function (s) { return !s.home && !s.withParents && s.urban; }, function (s) {
+  return { text: 'Власник квартири піднімає оренду на 15%.', opts: [
+    O('Платити', function () { s.money -= M(s) * 0.03; return 'Довелося платити більше.'; }),
+    O('Шукати дешевше житло', function () { s.money -= M(s) * 0.02; add(s, { happy: -4 }); return 'Переїзд забрав сили, але нове житло дешевше.'; })] };
+});
+ev('firstpay', [16, 30], 8, function (s) { return s.job && !s.job.teen && s.job.yrs === 1 && !s.flags.firstPay; }, function (s) {
+  s.flags.firstPay = 1; var p = jobPay(s), c = C(s);
+  return 'Перша повноцінна зарплата: ' + fmt(p) + ' на рік — це ' + (p > c.median * 1.3 ? 'більше' : p < c.median * 0.8 ? 'менше' : 'приблизно стільки ж,') + ' ніж у типового працівника в ' + c.name + '. У світі це більше, ніж у ' + Math.round(globalPct(p) * 100) + '% людей.';
+}, true);
+ev('remit', [20, 65], 5, function (s) { return s.immigrant && s.parents.some(function (p) { return p.alive; }) && s.lastInc > M(s) * 0.5; }, function (s) {
+  return { text: 'Батьки вдома ледве зводять кінці з кінцями. (Факт: мігранти надсилають у країни з низьким і середнім доходом ≈650 млрд $ на рік — World Bank, 2023.)', opts: [
+    O('Надсилати 10% доходу', function () { s.money -= s.lastInc * 0.1; s.parents.forEach(function (p) { p.rel += 10; }); add(s, { happy: 3 }); return 'Ти щомісяця надсилаєш гроші рідним.'; }),
+    O('Поки не можу', function () { s.parents.forEach(function (p) { p.rel -= 5; }); return 'Самому б вижити.'; })] };
+});
+ev('studloan', [18, 24], 6, function (s) { return s.study && s.study.t === 'uni' && C(s).feeType === 'high' && s.d <= 7 && !s.flags.loan; }, function (s) {
+  s.flags.loan = 1; var a = tuition(s, 'uni') * 3; s.debt += a; return 'Ти ' + g(s, 'взяв', 'взяла') + ' студентський кредит на ' + fmt(a) + '. (Факт: американці винні за студентськими кредитами ≈1,7 трлн $ — Federal Reserve, 2024.)';
+}, true);
+ev('heat', [0, 95], 2, function (s) { return ['IN', 'PK', 'BD', 'SA', 'AE', 'IQ', 'EG', 'SD', 'ML', 'NE', 'MX'].indexOf(s.country) >= 0; }, function (s) { add(s, { health: s.age > 65 ? -6 : -2 }); return 'Аномальна спека: +45° у тіні. ' + (s.age > 65 ? 'Літнім людям у таку погоду особливо важко.' : 'Вночі не заснути.'); });
+ev('commute', [18, 65], 3, function (s) { return s.job && s.urban && !(s.own && s.own.car) && C(s).gdp > 5; }, function (s) { add(s, { happy: -2 }); return 'Дорога на роботу — півтори години в один бік у переповненому транспорті.'; });
+ev('layoffwave', [20, 64], 3, function (s) { return s.job && s.econ < 0 && !s.job.teen; }, function (s) {
+  return { text: 'У компанії хвиля скорочень. Начальник пропонує або піти на мінімалку, або «за власним бажанням».', opts: [
+    O('Погодитися на меншу зарплату', function () { if (s.job) s.job.bonus = (s.job.bonus || 1) * 0.85; add(s, { happy: -5 }); return 'Зарплату урізали на 15%, але робота є.'; }),
+    O('Піти й шукати нову', function () { endJob(s, 'скорочення'); return 'Ти пішов' + g(s, '', 'ла') + ' з компанії.'; })] };
+});
+ev('parentcare', [35, 70], 3, function (s) { return s.parents.some(function (p) { return p.alive && p.age >= 80; }); }, function (s) {
+  var p = s.parents.filter(function (x) { return x.alive && x.age >= 80; })[0];
+  return { text: p.role + ' вже не може жити сам' + (p.sex === 'f' ? 'а' : '') + '. Що робите?', opts: [
+    O('Забрати до себе', function () { p.rel += 15; add(s, { happy: -4 }); s.flags.careHome = 0; return 'Тепер ' + (p.sex === 'f' ? 'мама' : 'тато') + ' живе з тобою. Важко, але поруч.'; }, '+8 год/тиждень на догляд'),
+    O('Будинок для літніх людей', function () { var c2 = M(s) * (C(s).gdp > 30 ? 1.2 : 0.4); s.money -= c2; p.rel -= 10; return 'Будинок для літніх: ' + fmt(c2) + ' на рік. Ти відвідуєш у вихідні.'; }, '~' + fmt(M(s) * (C(s).gdp > 30 ? 1.2 : 0.4)) + '/рік'),
+    O('Найняти доглядальницю', function () { var c3 = M(s) * 0.6; s.money -= c3; return 'Доглядальниця приходить щодня.'; }, '~' + fmt(M(s) * 0.6))] };
+}, true);

@@ -245,3 +245,13 @@ select, input[type=text] { width: 100%; background: var(--raise); color: var(--t
 .srow-c output { width: 48px; text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; }
 @media (max-width: 720px) { .srow { grid-template-columns: 1fr 130px; } }
 @media (max-width: 720px) { .money { gap: 10px; } .money .num { font-size: 14px; } .top .btn.small { padding: 6px 9px; } }
+
+.sec { font-family: var(--display); font-weight: 500; font-size: 11.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--accent); margin: 12px 2px 2px; }
+.sec:first-child { margin-top: 2px; }
+.peers { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.peer { display: grid; grid-template-columns: 28px 1fr; gap: 8px; align-items: center; background: var(--raise); border-radius: 10px; padding: 7px 10px; }
+.peer.me { border: 1px solid var(--accent); }
+.peer.dead { opacity: .55; }
+.peer .f { font-size: 20px; }
+.peer b { display: block; font-size: 13.5px; }
+.peer small { display: block; color: var(--muted); font-size: 12px; line-height: 1.35; }

@@ -3,6 +3,9 @@ var TABS = [
   { id: 'me', n: 'Я' }, { id: 'hobby', n: 'Хобі' }, { id: 'edu', n: 'Освіта' }, { id: 'work', n: 'Робота' },
   { id: 'love', n: 'Люди' }, { id: 'money', n: 'Гроші' }, { id: 'biz', n: 'Бізнес' }, { id: 'move', n: 'Переїзд' }, { id: 'risk', n: 'Ризик' }
 ];
+// Випадкові пропозиції року: генеруються один раз на рік, повторне відкриття їх не перекидає
+function yearly(s, key, gen) { s.offers = s.offers || {}; var o = s.offers[key]; if (!o || o.age !== s.age) { o = { age: s.age, v: gen(), used: [] }; s.offers[key] = o; } return o; }
+function wsample(arr, n, w) { var a = arr.slice(), out = []; while (a.length && out.length < n) { var x = wpick(a, w); out.push(x); a.splice(a.indexOf(x), 1); } return out; }
 function A(o) { if (o.ap == null) o.ap = 1; ACTIONS.push(o); }
 var ACTIONS = [];
 
@@ -95,9 +98,9 @@ A({ id: 'enroll_master', tab: 'edu', n: 'Магістратура', d: 'Якщо
 A({ id: 'enroll_voc', tab: 'edu', n: 'Вступити до коледжу', d: 'Робоча професія', show: function (s) { return !s.study && s.edu >= 2 && s.age >= 16 && s.age < 50; },
   run: function (s) { return { title: 'Коледж', text: 'Обери напрям.', opts: vocOpts(s, s.edu >= 3 ? 2 : 3) }; } });
 A({ id: 'course', tab: 'hobby', n: 'Платні курси', d: function (s) { return 'Навичка швидше, ніж самостійно · ' + fmt(M(s) * 0.1) + ' за рік навчання'; }, show: function (s) { return s.age >= 14 && C(s).gdp > 3; },
-  run: function (s) { var cost = M(s) * 0.1; return { title: 'Який курс?', text: 'Курс триває рік і дає приблизно стільки, скільки 4–5 годин самостійних занять щотижня. Коштує ' + fmt(cost) + '.', opts: Object.keys(HOBBY).map(function (k) { var v = s.sk[k]; return { t: SKILL_NAMES[k], sub: 'зараз ' + Math.round(v) + ' → ~' + Math.round(clamp(v + hobbyGain(s, v, 4.5))), dis: s.money < cost, f: function () { s.money -= cost; s.sk[k] = clamp(v + hobbyGain(s, v, 4.5) * rnd(0.8, 1.2)); return 'Курс завершено: ' + SKILL_NAMES[k] + ' ' + Math.round(s.sk[k]) + '.'; } }; }) }; } });
+  run: function (s) { var cost = M(s) * 0.1; return { title: 'Який курс?', text: 'Цього року в твоєму місті набирають такі курси. Курс триває рік і дає приблизно стільки, скільки 4–5 годин самостійних занять щотижня. Коштує ' + fmt(cost) + '.', opts: yearly(s, 'course', function () { return wsample(Object.keys(HOBBY), 3, function () { return 1; }); }).v.map(function (k) { var v = s.sk[k]; return { t: SKILL_NAMES[k], sub: 'зараз ' + Math.round(v) + ' → ~' + Math.round(clamp(v + hobbyGain(s, v, 4.5))), dis: s.money < cost, f: function () { s.money -= cost; s.sk[k] = clamp(v + hobbyGain(s, v, 4.5) * rnd(0.8, 1.2)); return 'Курс завершено: ' + SKILL_NAMES[k] + ' ' + Math.round(s.sk[k]) + '.'; } }; }) }; } });
 A({ id: 'langcourse', tab: 'hobby', n: 'Мовні курси', d: function (s) { return 'Будь-яка мова · ' + fmt(M(s) * 0.08) + ' за рік'; }, show: function (s) { return s.age >= 10; },
-  run: function (s) { var cost = M(s) * 0.08; return { title: 'Мовні курси', text: 'Рік курсів ≈ 4 години самостійних занять щотижня. Коштує ' + fmt(cost) + '.', opts: ['en'].concat(LEARNABLE).filter(function (l) { return langLevel(s, l) < 100; }).map(function (l) { var v = langLevel(s, l); return { t: LANG_NAMES[l], sub: 'зараз ' + Math.round(v), dis: s.money < cost, f: function () { s.money -= cost; var nv = clamp(v + hobbyGain(s, v, 4) * rnd(0.8, 1.2)); if (l === 'en') s.sk.eng = nv; else s.lang[l] = nv; return LANG_NAMES[l] + ': ' + Math.round(nv) + '/100.'; } }; }) }; } });
+  run: function (s) { var cost = M(s) * 0.08; return { title: 'Мовні курси', text: 'Цього року доступні такі групи. Рік курсів ≈ 4 години самостійних занять щотижня. Коштує ' + fmt(cost) + '.', opts: yearly(s, 'lcourse', function () { return ['en'].concat(wsample(LEARNABLE.filter(function (l) { return langLevel(s, l) < 100; }), 2, function (l) { return ['pl', 'de', 'es', 'fr'].indexOf(l) >= 0 ? 2 : 1; })); }).v.filter(function (l) { return langLevel(s, l) < 100; }).map(function (l) { var v = langLevel(s, l); return { t: LANG_NAMES[l], sub: 'зараз ' + Math.round(v), dis: s.money < cost, f: function () { s.money -= cost; var nv = clamp(v + hobbyGain(s, v, 4) * rnd(0.8, 1.2)); if (l === 'en') s.sk.eng = nv; else s.lang[l] = nv; return LANG_NAMES[l] + ': ' + Math.round(nv) + '/100.'; } }; }) }; } });
 A({ id: 'picklang', tab: 'hobby', n: 'Яку мову вчити самостійно', ap: 0, d: function (s) { return s.langTarget ? LANG_NAMES[s.langTarget] + ' — години став у «Розкладі»' : 'Обери мову, потім додай години в «Розкладі»'; }, show: function (s) { return s.age >= 8; },
   run: function (s) { return { title: 'Мова для самостійного вивчення', text: 'Англійська вчиться окремим рядком у розкладі.', opts: LEARNABLE.filter(function (l) { return (s.lang[l] || 0) < 100; }).map(function (l) { return { t: LANG_NAMES[l], sub: 'зараз ' + Math.round(s.lang[l] || 0), f: function () { s.langTarget = l; if (!s.sched.lang) s.sched.lang = 3; return 'Тепер ти вчиш: ' + LANG_NAMES[l].toLowerCase() + '.'; } }; }) }; } });
 A({ id: 'pickfree', tab: 'hobby', n: 'Навичка для фрилансу', ap: 0, d: function (s) { return s.freeSkill ? HOBBY[s.freeSkill].free + ' — години став у «Розкладі»' : 'Відкривається з навички 35'; }, show: function (s) { return s.age >= 14 && Object.keys(HOBBY).some(function (k) { return s.sk[k] >= 35; }); },
@@ -107,7 +110,15 @@ A({ id: 'dropout', tab: 'edu', n: 'Кинути навчання', ap: 0, d: 'Б
 
 // ---- Робота ----
 function jobOptions(s, apps) {
-  var list = JOBS.map(function (j) { return { j: j, c: jobCheck(s, j) }; }).filter(function (x) { return x.c.ok && !(s.job && s.job.id === x.j.id); });
+  var all = JOBS.map(function (j) { return { j: j, c: jobCheck(s, j) }; }).filter(function (x) { return x.c.ok && !(s.job && s.job.id === x.j.id); });
+  var off = yearly(s, 'job', function () {
+    var n = s.urban ? 4 : 3;
+    return wsample(all, n, function (x) { var j = x.j, w = j.comp * (j.edu <= 2 ? 2 : 1) * (j.vol ? 0.5 : 1);
+      if (j.f && j.f.some(function (f) { return s.fields.indexOf(f) >= 0 || s.vfields.indexOf(f) >= 0; })) w *= 3;
+      if (hobbyFor(j.id).some(function (k) { return s.sk[k] >= 40; })) w *= 2;
+      if (yearsIn(s, j.id)) w *= 2; return w; }).map(function (x) { return x.j.id; });
+  });
+  var list = all.filter(function (x) { return off.v.indexOf(x.j.id) >= 0 && off.used.indexOf(x.j.id) < 0; });
   list.sort(function (a, b) { return jobBase(s, b.j) - jobBase(s, a.j); });
   var opts = list.map(function (x) {
     var j = x.j, p = offerChance(s, j);
@@ -117,13 +128,13 @@ function jobOptions(s, apps) {
     return { t: j.n, sub: 'шанс ' + Math.round(p * 100) + '% · ~' + fmt(pay) + '/рік' + (ai ? ' · через хобі (' + SKILL_NAMES[ai.k] + ')' : '') + (j.vol ? ' · дохід залежить від слави' : ''),
       f: function () {
         if (chance(p)) { takeJob(s, j, !!s.study); add(s, { happy: 5 }); return 'Тебе взяли: ' + j.n + (s.job.part ? ' (неповний день, поки вчишся)' : '') + '!' + (ai ? ' Хобі стало професією.' : ''); }
-        apps--; if (apps <= 0) return 'Відмова на посаду «' + j.n + '». На цей рік спроби вичерпано.';
+        off.used.push(j.id); apps--; if (apps <= 0) return 'Відмова на посаду «' + j.n + '». На цей рік спроби вичерпано.';
         var nx = jobOptions(s, apps); nx.text = 'Відмова на «' + j.n + '». Залишилось спроб: ' + apps + '.'; return nx;
       } };
   });
-  return { title: 'Вакансії', text: 'Можеш подати 3 заявки за рік. Шанси залежать від освіти, навичок, досвіду, економіки й країни.', opts: opts.length ? opts : [{ t: 'Немає підходящих вакансій', sub: 'підвищуй освіту або навички', f: function () { return 'Підходящих вакансій не знайшлося.'; } }] };
+  return { title: 'Вакансії цього року', text: 'Це те, що трапилося тобі цього року (у місті вакансій більше). До 3 заявок. Нові вакансії — наступного року. Безробіття в країні: ' + Math.round(C(s).unemp * 100) + '%.', opts: opts.length ? opts : [{ t: 'Цього року нічого підходящого', sub: 'підвищуй освіту чи навички або переїдь у місто', f: function () { return 'Підходящих вакансій не трапилося.'; } }] };
 }
-A({ id: 'findjob', tab: 'work', n: 'Шукати роботу', d: function (s) { return 'До 3 заявок' + (hasRecord(s) ? ' · судимість знижує шанси' : ''); }, show: function (s) { return s.age >= 16 && !s.retired; }, run: function (s) { return jobOptions(s, 3); } });
+A({ id: 'findjob', tab: 'work', n: 'Шукати роботу', d: function (s) { return 'До 3 заявок' + (hasRecord(s) ? ' · судимість знижує шанси' : ''); }, show: function (s) { return s.age >= 16 && !s.retired; }, run: function (s) { var o = yearly(s, 'jobapps', function () { return 3; }); return jobOptions(s, o.v); } });
 A({ id: 'teenjob', tab: 'work', n: 'Підробіток', d: 'Кишенькові гроші', show: function (s) { return s.age >= 13 && s.age < 18; },
   run: function (s) { var ok = TEEN_JOBS.filter(function (t) { return !t.need || Object.keys(t.need).every(function (k) { return skillVal(s, k) >= t.need[k]; }); }); var t = pick(ok); var e = M(s) * t.pay; s.money += e; add(s, { happy: -1, social: 1 }); return t.n + ' — заробив' + g(s, '', 'ла') + ' ' + fmt(e) + '.'; } });
 A({ id: 'work', tab: 'work', n: 'Працювати на повну', d: 'Продуктивність ↑ (шанс підвищення), щастя ↓', show: function (s) { return s.job && !s.job.teen; },
@@ -210,28 +221,36 @@ A({ id: 'lifestyle', tab: 'money', n: 'Стиль життя', ap: 0, d: functio
 // ---- Бізнес ----
 A({ id: 'openbiz', tab: 'biz', n: 'Відкрити бізнес', d: 'Видно ризик і твою підготовку', show: function (s) { return s.age >= 18; },
   run: function (s) {
-    var opts = BIZ.map(function (T) {
-      var why = bizCan(s, T);
-      if (why) return { t: T.n, sub: why, dis: true, f: function () { return ''; } };
-      var cost = bizCost(s, T.id), sv = bizSurvival(s, T.id), can = s.money >= cost || (s.money >= cost * 0.3 && canBorrow(s));
-      return { t: T.n + ' — ' + fmt(cost), sub: 'підготовка: ' + bizReadyLabel(sv.q) + ' · шанс протриматися 3 роки без доплат ~' + Math.round(sv.p * 100) + '%' + (T.startup ? ' · рідко, але може «вистрілити»' : '') + (s.money < cost ? (can ? ' · решта в кредит' : canBorrow(s) ? ' · треба мати 30%' : ' · банк не дає кредит') : ''), dis: !can,
-        f: function () { return openBiz(s, T.id); } };
+    var off = yearly(s, 'biz', function () {
+      var ok = BIZ.filter(function (T) { return !bizCan(s, T); });
+      return wsample(ok, 3, function (T) { return (T.rel.jobs.some(function (id) { return yearsIn(s, id); }) ? 3 : 1) * (s.sk[T.rel.skill] >= 40 ? 2 : 1) * (T.startup ? 0.5 : 1); })
+        .map(function (T) { return { id: T.id, pm: rnd(0.75, 1.3), loc: pick([-0.04, -0.02, 0, 0, 0.02, 0.04]) }; });
     });
-    return { title: 'Новий бізнес', text: 'Успіх залежить від розуму, досвіду в галузі, профільного хобі, навички підприємництва й того, чи ти працюєш у бізнесі сам. Готівка: ' + fmt(s.money) + '. Кредитний рейтинг: ' + Math.round(s.credit) + '. Власна практика відкривається після досвіду в професії.', opts: opts };
+    var LOC = { '-0.04': 'погане місце', '-0.02': 'так собі місце', '0': 'звичайне місце', '0.02': 'добре місце', '0.04': 'чудове місце' };
+    var opts = off.v.filter(function (x) { return off.used.indexOf(x.id) < 0; }).map(function (x) {
+      var T = BIZM[x.id], cost = bizCost(s, T.id) * x.pm, sv = bizSurvival(s, T.id), can = s.money >= cost || (s.money >= cost * 0.3 && canBorrow(s));
+      return { t: T.n + ' — ' + fmt(cost), sub: LOC[String(x.loc)] + (x.pm < 0.9 ? ', вигідна ціна' : x.pm > 1.15 ? ', дорого' : '') + ' · підготовка: ' + bizReadyLabel(sv.q) + ' · протриматися 3 роки ~' + Math.round(clamp(sv.p + x.loc * 3, 0.02, 0.99) * 100) + '%' + (s.money < cost ? (can ? ' · решта в кредит' : canBorrow(s) ? ' · треба мати 30%' : ' · банк не дає кредит') : ''), dis: !can,
+        f: function () { off.used.push(x.id); return openBiz(s, T.id, x.pm, x.loc); } };
+    });
+    if (!opts.length) opts = [{ t: 'Цього року нічого не трапилося', sub: 'нові можливості — наступного року', f: function () { return 'Можливостей для бізнесу цього року не знайшлося.'; } }];
+    return { title: 'Можливості для бізнесу цього року', text: 'Це те, що тобі трапилося цього року. Успіх залежить від розуму, досвіду в галузі, профільного хобі, навички підприємництва й того, чи ти працюєш у бізнесі сам. Готівка: ' + fmt(s.money) + '. Кредитний рейтинг: ' + Math.round(s.credit) + '. Власна практика відкривається після досвіду в професії.', opts: opts };
   } });
 A({ id: 'bizmanage', tab: 'biz', n: 'Керувати бізнесом', ap: 0, d: function (s) { return s.biz.map(function (b) { return b.name; }).join(', '); }, show: function (s) { return s.biz.length > 0; },
   run: function (s) { return { title: 'Мої бізнеси', text: 'Обери бізнес.', opts: s.biz.map(function (b) { return { t: b.name, sub: 'рік ' + b.yrs + ' · ' + (b.last >= 0 ? '+' : '') + fmt(b.last) + ' · каса ' + fmt(b.cash) + ' · вартість ~' + fmt(bizValue(s, b)), f: function () { return bizMenu(s, b); } }; }) }; } });
 function bizMenu(s, b) {
   var o = [];
-  if (!b.focus) o.push({ t: 'Працювати в бізнесі на повну (1 дія)', sub: 'підготовка ↑ цього року', dis: s.ap < 1, f: function () { s.ap--; b.focus = true; add(s, { happy: -2 }); return 'Цього року ти тягнеш «' + b.name + '» на собі.'; } });
+  b.acts = b.acts && b.acts.age === s.age ? b.acts : { age: s.age };
+  var done = function (k) { return !!b.acts[k]; }, mark1 = function (k) { b.acts[k] = 1; };
+  var sat = BIZM[b.type].cost * M(s) * (BIZ_SCALE[b.type] || 20);
+  if (!b.focus) o.push({ t: 'Працювати в бізнесі на повну цього року', sub: 'підготовка ↑, але менше відпочинку (−10 год/тиждень)', f: function () { b.focus = true; add(s, { happy: -3, health: -1 }); return 'Цього року ти тягнеш «' + b.name + '» на собі.'; } });
   var ex = b.cap * 0.5;
-  o.push({ t: 'Розширити за ' + fmt(ex), sub: 'більший оборот і більший ризик', dis: s.money < ex, f: function () { s.money -= ex; b.cap += ex; return '«' + b.name + '» розширено.'; } });
+  o.push({ t: 'Розширити за ' + fmt(ex), sub: done('ex') ? 'вже розширював цього року' : b.cap > sat ? 'ринок насичений — віддача від розширення падає' : 'більший оборот і більший ризик · раз на рік', dis: s.money < ex || done('ex'), f: function () { mark1('ex'); s.money -= ex; b.cap += ex; return '«' + b.name + '» розширено.'; } });
   var maxStaff = Math.max(1, Math.floor(b.cap / (M(s) * 0.3)));
   var addN = Math.min(3, maxStaff - (b.staff || 0)), hire = addN * M(s) * 0.3;
-  o.push({ t: 'Найняти працівників (' + (b.staff || 0) + ' → ' + ((b.staff || 0) + addN) + ') за ' + fmt(hire), sub: 'наймання й обладнання зараз; далі кожен коштує ~' + fmt(M(s) * 0.9) + '/рік із каси й приносить більше, якщо добре керуєш · макс. ' + maxStaff + ' на капітал ' + fmt(b.cap), dis: addN <= 0 || s.money < hire, f: function () { s.money -= hire; b.staff = (b.staff || 0) + addN; return 'У «' + b.name + '» тепер ' + b.staff + ' працівників.'; } });
+  o.push({ t: 'Найняти працівників (' + (b.staff || 0) + ' → ' + ((b.staff || 0) + addN) + ') за ' + fmt(hire), sub: 'наймання й обладнання зараз; далі кожен коштує ~' + fmt(M(s) * 0.9) + '/рік із каси й приносить більше, якщо добре керуєш · макс. ' + maxStaff + ' на капітал ' + fmt(b.cap), dis: addN <= 0 || s.money < hire || done('hire'), f: function () { mark1('hire'); s.money -= hire; b.staff = (b.staff || 0) + addN; return 'У «' + b.name + '» тепер ' + b.staff + ' працівників.'; } });
   if (b.staff) o.push({ t: 'Скоротити працівників (' + b.staff + ' → ' + Math.max(0, b.staff - 3) + ')', f: function () { b.staff = Math.max(0, b.staff - 3); add(s, { happy: -2 }); return 'Довелося скоротити людей.'; } });
   var T = BIZM[b.type];
-  if (T.points) { var pc = T.cost * M(s); o.push({ t: 'Відкрити ще одну точку за ' + fmt(pc), sub: 'точок: ' + (b.points || 1), dis: s.money < pc, f: function () { s.money -= pc; b.cap += pc * 0.8; b.cash += pc * 0.2; b.points = (b.points || 1) + 1; mark(s, '«' + b.name + '»: ' + b.points + ' точки'); return 'Відкрито нову точку «' + b.name + '». Усього: ' + b.points + '.'; } }); }
+  if (T.points) { var pc = T.cost * M(s); o.push({ t: 'Відкрити ще одну точку за ' + fmt(pc), sub: 'точок: ' + (b.points || 1) + ' · раз на рік', dis: s.money < pc || done('pt'), f: function () { mark1('pt'); s.money -= pc; b.cap += pc * 0.8; b.cash += pc * 0.2; b.points = (b.points || 1) + 1; mark(s, '«' + b.name + '»: ' + b.points + ' точки'); return 'Відкрито нову точку «' + b.name + '». Усього: ' + b.points + '.'; } }); }
   if (T.points && b.fran == null && (b.points || 1) >= 3 && b.yrs >= 4) o.push({ t: 'Запустити франшизу', sub: 'інші відкриватимуть точки під твоїм брендом і платитимуть роялті', f: function () { b.fran = 0; mark(s, 'Франшиза «' + b.name + '»'); return 'Франшизу «' + b.name + '» запущено.'; } });
   if (!b.inv) o.push({ t: 'Залучити інвестора', sub: 'гроші в обмін на частку · твоя частка ' + Math.round((b.share || 1) * 100) + '%', f: function () {
     b.inv = s.age; var q = bizQ(s, b), p = clamp(0.15 + q / 150 + (b.last > 0 ? 0.15 : 0) + (T.startup ? 0.1 : 0), 0.05, 0.85);
@@ -286,13 +305,15 @@ A({ id: 'emigrate', tab: 'move', n: 'Емігрувати', d: 'Робоча в�
       o.push({ t: d.flag + ' ' + d.name + ' — просто переїхати', sub: 'шанс ~85% · ' + fmt(cost) + ' · закон: ' + (d.law > 0.75 ? 'суворий' : d.law > 0.5 ? 'працює' : 'слабкий') + (NARCO.indexOf(d.code) >= 0 ? ' · тут діють картелі' : '') + (d.conflict === 2 ? ' · війна' : ''), dis: s.money < cost,
         f: function () { s.money -= cost; if (chance(0.85)) return emigrate(s, d.code, 'переїзд'); return 'На кордоні щось пішло не так — довелося повернутися.'; } });
     });
+    var off = yearly(s, 'emig', function () { return wsample(o, 4, function (x) { return /біженець/.test(x.t) ? 5 : /просто переїхати/.test(x.t) ? 0.5 : /Лотерея/.test(x.t) ? 0.7 : 1; }).map(function (x) { return x.t; }); });
+    o = o.filter(function (x) { return off.v.indexOf(x.t) >= 0; });
     if (s.immigrant) o.unshift({ t: COUNTRIES[s.birth].flag + ' Повернутися додому', sub: COUNTRIES[s.birth].name, f: function () { return emigrate(s, s.birth, 'повернення'); } });
-    return { title: 'Еміграція', text: 'Шанс залежить від освіти, мови країни, досвіду й відкритості. Після переїзду платять менше, поки не вивчиш мову і не адаптуєшся; мова підтягується сама, якщо живеш там.', opts: o.length ? o : [{ t: 'Немає варіантів', sub: 'потрібна освіта від коледжу або вік до 30 для навчання', f: function () { return 'Поки варіантів немає.'; } }] };
+    return { title: 'Шанси на переїзд цього року', text: 'Тобі трапилися такі варіанти; інші можуть зʼявитися наступного року. Шанс залежить від освіти, мови країни, досвіду й відкритості. Після переїзду платять менше, поки не вивчиш мову і не адаптуєшся; мова підтягується сама, якщо живеш там.', opts: o.length ? o : [{ t: 'Немає варіантів', sub: 'потрібна освіта від коледжу або вік до 30 для навчання', f: function () { return 'Поки варіантів немає.'; } }] };
   } });
 function yearsWorked(s) { return s.workYears; }
 
 function availableActions(s, tab) {
-  return ACTIONS.filter(function (a) { return a.tab === tab && s.alive && (!s.prison || a.prisonOk) && a.show(s); });
+  return ACTIONS.filter(function (a) { return a.tab === tab && !a.hidden && s.alive && (!s.prison || a.prisonOk) && a.show(s); });
 }
 function doAction(s, a) {
   if (a.ap > 0 && s.used[a.id]) return null;   // ap > 0: можна раз на рік
@@ -305,15 +326,15 @@ function doAction(s, a) {
 function crimeCaught(s, base) { var p = (base + (s.heat || 0) * 0.07) * (0.4 + C(s).law) * (cartel(s) ? 0.4 : 1); s.heat = (s.heat || 0) + 1; return chance(clamp(p, 0, 0.95)); }
 function confiscate(s) { var l = s.money * 0.8 + s.inv.cry * 0.8 + s.inv.stk * 0.5; s.money *= 0.2; s.inv.cry *= 0.2; s.inv.stk *= 0.5; return l; }
 function busted(s, yrs, what) { var l = confiscate(s); var r = sentence(s, yrs, what); s.heat = 0; return r + (l > 1 ? ' Конфісковано ' + fmt(l) + '.' : ''); }
-A({ id: 'shadow', tab: 'risk', n: 'Робота «в конверті»', d: 'Без податків; невеликий ризик штрафу', show: function (s) { return s.age >= 16; },
+A({ id: 'shadow', hidden: 1, tab: 'risk', n: 'Робота «в конверті»', d: 'Без податків; невеликий ризик штрафу', show: function (s) { return s.age >= 16; },
   run: function (s) { var e = M(s) * rnd(0.1, 0.2); if (chance(0.06 * (0.4 + C(s).law))) { var f = e * 2; s.money -= f; return 'Податкова помітила неоформлений заробіток — штраф ' + fmt(f) + '.'; } s.shadow = (s.shadow || 0) + e; s.lastShadow = s.age; return 'Цього року ти отримаєш ' + fmt(e) + ' без податків.'; } });
-A({ id: 'steal', tab: 'risk', n: 'Дрібна крадіжка', d: 'Мало грошей, високий ризик', show: function (s) { return s.age >= 12; },
+A({ id: 'steal', hidden: 1, tab: 'risk', n: 'Дрібна крадіжка', d: 'Мало грошей, високий ризик', show: function (s) { return s.age >= 12; },
   run: function (s) { if (crimeCaught(s, 0.3)) { if (s.age < 18) { s.flags.juvenile = 1; add(s, { happy: -8 }); s.parents.forEach(function (p) { p.rel -= 15; }); s.heat = 0; return 'Тебе спіймали. Поліція, ювенальний облік і дуже важка розмова з батьками.'; } if (chance(0.5)) { var f = M(s) * 0.1; s.money -= f; s.record++; s.recordAge = s.age; s.heat = 0; return 'Спіймали: штраф ' + fmt(f) + ' і судимість.'; } return busted(s, ri(1, 2), 'крадіжку'); }
     var e = M(s) * rnd(0.01, 0.06); s.money += e; add(s, { happy: -2 }); return 'Вкрадено на ' + fmt(e) + '. На душі неспокійно.'; } });
-A({ id: 'scheme', tab: 'risk', n: 'Афера', d: 'Гроші, якщо пощастить. Кожна наступна — ризикованіша', show: function (s) { return s.age >= 18; },
+A({ id: 'scheme', hidden: 1, tab: 'risk', n: 'Афера', d: 'Гроші, якщо пощастить. Кожна наступна — ризикованіша', show: function (s) { return s.age >= 18; },
   run: function (s) { if (crimeCaught(s, 0.3 - s.st.smarts / 600)) return busted(s, ri(2, 6), 'шахрайство');
     var e = M(s) * rnd(0.15, 0.9) * (s.st.smarts / 70); s.money += e; return 'Афера вдалася: +' + fmt(e) + '. Але тепер за тобою можуть стежити.'; } });
-A({ id: 'smuggle', tab: 'risk', n: 'Контрабанда через кордон', d: 'Ризиковано; залежить від того, як працює закон у країні', show: function (s) { return s.age >= 18 && C(s).law < 0.7; },
+A({ id: 'smuggle', hidden: 1, tab: 'risk', n: 'Контрабанда через кордон', d: 'Ризиковано; залежить від того, як працює закон у країні', show: function (s) { return s.age >= 18 && C(s).law < 0.7; },
   run: function (s) { if (crimeCaught(s, 0.28)) return busted(s, ri(2, 5), 'контрабанду'); var e = M(s) * rnd(0.2, 0.8); s.money += e; return 'Партія пройшла: +' + fmt(e) + '.'; } });
 
 // ---- Угруповання ----
@@ -350,13 +371,14 @@ function buyPrompt(s) {
 }
 function vehPrompt(s) {
   var c = C(s), o = s.own, trade = o.car ? o.carVal : 0;
-  var opts = VEHICLES.filter(function (v) { return v.id !== o.car; }).map(function (v) {
-    var price = v.p * c.median, need = price - trade;
-    return { t: v.n + ' — ' + fmt(price), sub: 'утримання ~' + fmt(v.up * c.median) + '/рік · щастя +' + v.hap + (v.soc ? ', статус +' + v.soc : '') + (v.id !== 'bike' ? ' · менше часу в дорозі' : ', здоровʼя +') + (trade ? ' · старе в залік ' + fmt(trade) : ''), dis: s.money < need || s.age < (v.id === 'bike' ? 6 : v.id === 'scooter' ? 16 : 18),
+  var deals = yearly(s, 'veh', function () { return wsample(VEHICLES, 3, function (v) { return v.p < 3 ? 2 : 1; }).map(function (v) { return { id: v.id, pm: rnd(0.8, 1.15) }; }); });
+  var opts = deals.v.filter(function (x) { return x.id !== o.car; }).map(function (x) {
+    var v = VEHICLE[x.id], price = v.p * c.median * x.pm, need = price - trade;
+    return { t: v.n + ' — ' + fmt(price) + (x.pm < 0.9 ? ' (вигідно)' : ''), sub: 'утримання ~' + fmt(v.up * c.median) + '/рік · щастя +' + v.hap + (v.soc ? ', статус +' + v.soc : '') + (v.id !== 'bike' ? ' · менше часу в дорозі' : ', здоровʼя +') + (trade ? ' · старе в залік ' + fmt(trade) : ''), dis: s.money < need || s.age < (v.id === 'bike' ? 6 : v.id === 'scooter' ? 16 : 18),
       f: function () { s.money -= need; o.car = v.id; o.carVal = price; mark(s, 'Купив' + g(s, '', 'ла') + ': ' + v.n.toLowerCase()); return 'Тепер у тебе ' + v.n.toLowerCase() + '.'; } };
   });
   if (o.car) opts.push({ t: 'Продати ' + VEHICLE[o.car].n.toLowerCase(), sub: fmt(o.carVal), f: function () { s.money += o.carVal; o.car = null; o.carVal = 0; return 'Транспорт продано.'; } });
-  return { title: 'Транспорт', text: 'Ціни — у твоїй країні. Транспорт щороку дешевшає на ~13%.', opts: opts };
+  return { title: 'Транспорт', text: 'Оголошення цього року (нові — наступного). Ціни — у твоїй країні. Транспорт щороку дешевшає на ~13%.', opts: opts };
 }
 function tierPrompt(s, key, LVL, title) {
   var c = C(s), o = s.own, mult = key === 'homeLvl' ? (s.home ? (s.home.kind === 'Будинок' ? 1.6 : 1) : 0.6) : 1;
@@ -367,3 +389,12 @@ function tierPrompt(s, key, LVL, title) {
   }) };
 }
 A({ id: 'buy', tab: 'money', n: 'Покупки', ap: 0, d: 'Транспорт, речі, облаштування дому, тварини', show: function (s) { return s.age >= 6; }, run: buyPrompt });
+
+A({ id: 'shady', tab: 'risk', n: 'Тіньові пропозиції', d: 'Що тобі запропонували цього року', show: function (s) { return s.age >= 12 && !s.prison; },
+  run: function (s) {
+    var pool = ACTIONS.filter(function (a) { return a.hidden && a.tab === 'risk' && a.show(s); });
+    var off = yearly(s, 'shady', function () { return wsample(pool, chance(0.5) ? 1 : 2, function (a) { return a.id === 'shadow' ? 2 : 1; }).map(function (a) { return a.id; }); });
+    var opts = off.v.filter(function (id) { return off.used.indexOf(id) < 0; }).map(function (id) { var a = ACTIONS.filter(function (x) { return x.id === id; })[0]; return { t: a.n, sub: typeof a.d === 'function' ? a.d(s) : a.d, f: function () { off.used.push(id); return a.run(s); } }; });
+    opts.push({ t: 'Відмовитися від усього', f: function () { off.used = off.v.slice(); return 'Ти не вʼязуєшся в сумнівне.'; } });
+    return { title: 'Тіньові пропозиції', text: cartel(s) ? 'Тут таких пропозицій вистачає, а поліції — ні.' : 'Знайомі знайомих пропонують «підзаробити».', opts: opts };
+  } });

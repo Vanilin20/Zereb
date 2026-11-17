@@ -369,3 +369,10 @@ var HOME_LV = [
   { n: 'Гарний ремонт', p: 1.5, hap: 6, health: 2 },
   { n: 'Дизайнерський інтерʼєр', p: 5, hap: 9, health: 2 }
 ];
+
+// Нерівність (Gini, приблизно, World Bank) і безробіття (%, приблизно, ILO) — ~2022–2024
+var GINI = { IN: 33, CN: 37, NG: 35, PK: 30, ID: 38, CD: 45, ET: 35, US: 40, BD: 32, BR: 52, EG: 32, TZ: 40, PH: 41, MX: 45, UG: 43, KE: 39, AF: 31, SD: 34, VN: 36, AO: 51, NE: 33, MZ: 54, IQ: 30, ZA: 63, IR: 35, TR: 42, YE: 37, GH: 44, CM: 47, ML: 36, MG: 43, MM: 31, JP: 33, DE: 32, FR: 32, GB: 33, SA: 46, TH: 35, NP: 33, CO: 55, AR: 42, IT: 35, CA: 32, ES: 34, AU: 34, HT: 41, PL: 29, KR: 31, UA: 26, SE: 29, UZ: 31, DZ: 28, MA: 40, PE: 40, MY: 41, KZ: 29, LK: 38, CL: 43, IL: 38, NL: 26, RO: 34, BE: 26, AZ: 27, AE: 26, CZ: 26, HU: 30, PT: 33, CH: 33, AT: 30, GR: 33, RS: 33, NZ: 32, DK: 28, BG: 39, IE: 30, SK: 23, NO: 27, FI: 27, GE: 34, AM: 28, SG: 37, HR: 29, MD: 26, LT: 35, LV: 34, EE: 31 };
+var UNEMP = { ZA: 32, ES: 12, GR: 11, IR: 9, TR: 9, IT: 7, FR: 7, UA: 13, PL: 3, CZ: 3, DE: 3, US: 4, JP: 2.6, KR: 2.8, IN: 8, BR: 8, CO: 10, MA: 12, DZ: 12, SD: 20, YE: 18, AF: 14, IQ: 15, EG: 7, KE: 6, HT: 15, AM: 9, GE: 11, RS: 9, MD: 4, BG: 4, RO: 5.5, HU: 4, LT: 7, LV: 6.5, EE: 6.5, FI: 8, SE: 8, NO: 4, DK: 5, NL: 3.7, BE: 5.6, AT: 5.3, CH: 4, IE: 4.4, PT: 6.5, HR: 6, SK: 6, CL: 8.5, PE: 7, AR: 7, MX: 3, VN: 2, TH: 1, PH: 4, ID: 5, MY: 3.5, SG: 2, CN: 5, BD: 5, PK: 8, LK: 5, NP: 10, UZ: 7, KZ: 5, AZ: 6, IL: 3.5, AE: 3, SA: 5, NG: 5, ET: 4, GH: 4, CM: 4, TZ: 3, UG: 3, MZ: 4, MG: 3, ML: 3, NE: 1, CD: 5, AO: 15, MM: 3, AU: 3.8, CA: 6, GB: 4.2, NZ: 4.5 };
+COUNTRY_LIST.forEach(function (c) { c.gini = (GINI[c.code] || 35) / 100; c.unemp = (UNEMP[c.code] || 6) / 100; });
+// Наскільки великим може вирости бізнес цього типу (× стартового капіталу), далі віддача падає
+var BIZ_SCALE = { kiosk: 15, cafe: 25, restaurant: 30, online: 150, auto: 20, salon: 20, farm: 40, build: 120, logistic: 150, itstudio: 120, clinic: 60, medprac: 10, lawprac: 12, archprac: 12, vetprac: 10, psyprac: 6, gamestudio: 200, startup: 500 };
