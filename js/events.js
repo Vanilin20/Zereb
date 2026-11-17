@@ -443,3 +443,208 @@ ev('parentcare', [35, 70], 3, function (s) { return s.parents.some(function (p) 
     O('Будинок для літніх людей', function () { var c2 = M(s) * (C(s).gdp > 30 ? 1.2 : 0.4); s.money -= c2; p.rel -= 10; return 'Будинок для літніх: ' + fmt(c2) + ' на рік. Ти відвідуєш у вихідні.'; }, '~' + fmt(M(s) * (C(s).gdp > 30 ? 1.2 : 0.4)) + '/рік'),
     O('Найняти доглядальницю', function () { var c3 = M(s) * 0.6; s.money -= c3; return 'Доглядальниця приходить щодня.'; }, '~' + fmt(M(s) * 0.6))] };
 }, true);
+
+// ======================================================================
+// Переписані події: менш очевидні рішення, результат залежить від країни, навичок і випадку
+// ======================================================================
+ev('wallet', [8, 75], 1.5, null, function (s) {
+  var m = M(s) * rnd(0.02, 0.06), law = C(s).law;
+  return { text: 'Ти знайш' + g(s, 'ов', 'ла') + ' гаманець: ' + fmt(m) + ' і документи. Поруч нікого.', opts: [
+    O('Віднести в поліцію', function () { if (chance(law)) { if (chance(0.3)) { s.money += m * 0.15; return 'Власник забрав гаманець і передав тобі подяку з грошима.'; } add(s, { happy: 3 }); return 'Власник отримав гаманець назад.'; } add(s, { happy: -2 }); return 'Пізніше ти дізнав' + g(s, 'ся', 'лася') + ', що гроші з гаманця «зникли» ще у відділку.'; }, law > 0.7 ? 'поліція тут працює' : 'поліції тут не дуже довіряють'),
+    O('Шукати власника самому', function () { add(s, { happy: -1 }); if (chance(0.55 + s.st.social / 300)) { add(s, { happy: 5, social: 3 }); if (chance(0.35)) s.friends++; return 'Знайш' + g(s, 'ов', 'ла') + ' власника через соцмережі — він дуже вдячний' + (s.friends ? '. Здається, у тебе новий знайомий.' : '.'); } return 'Витратив' + g(s, '', 'ла') + ' пів дня — власника не знайшов' + g(s, '', 'ла') + '.'; }, 'забере час'),
+    O('Забрати гроші, документи підкинути', function () { s.money += m; if (s.urban && chance(0.15 + law * 0.2)) { s.money -= m * 2; add(s, { happy: -8, social: -4 }); return 'Камера на вулиці все записала. Довелося повернути гроші й заплатити штраф.'; } add(s, { happy: -2 }); return '+' + fmt(m) + '. Ніхто не дізнався. Поки що.'; })] };
+});
+ev('scam', [16, 85], 1.3, function (s) { return s.money > M(s) * 0.05; }, function (s) {
+  var real = chance(0.25);
+  return { text: 'Дзвінок: «Служба безпеки банку. З вашої картки намагаються зняти гроші. Назвіть код з SMS, щоб скасувати операцію». Голос упевнений, номер схожий на банківський.', opts: [
+    O('Назвати код', function () { if (real) return 'Як не дивно, це справді був банк — операцію скасували.'; var l = s.money * 0.4; s.money -= l; add(s, { happy: -8 }); return 'Це були шахраї. З рахунку зникло ' + fmt(l) + '.'; }),
+    O('Покласти й самому передзвонити в банк', function () { if (real && chance(0.5)) { var l2 = s.money * 0.08; s.money -= l2; return 'Поки ти додзвонював' + g(s, 'ся', 'лася') + ' на гарячу лінію, з картки встигли зняти ' + fmt(l2) + '.'; } return 'У банку сказали, що це шахраї. Година на лінії — і гроші цілі.'; }, 'надійно, але повільно'),
+    O('Нічого не робити', function () { if (real) { var l3 = s.money * 0.15; s.money -= l3; return 'Виявилося, картку справді зламали: зникло ' + fmt(l3) + '.'; } return 'Більше не дзвонили.'; })] };
+});
+ev('cheat', [13, 18], 2.5, function (s) { return !!s.study; }, function (s) {
+  var law = C(s).law, price = M(s) * 0.03;
+  return { text: 'Перед важливим іспитом однокласник продає відповіді за ' + fmt(price) + '. Каже, «всі так роблять».', opts: [
+    O('Купити', function () { s.money -= price; if (chance(0.1 + law * 0.25)) { add(s, { gpa: -20, happy: -8 }); s.parents.forEach(function (p) { p.rel -= 8; }); return 'Іспит анулювали — відповіді «злили» вчителям.'; } if (chance(0.2)) { add(s, { gpa: -3 }); return 'Відповіді виявилися фейком. Гроші на вітер.'; } add(s, { gpa: 12 }); return 'Іспит здано на відмінно. Знань, щоправда, не додалося.'; }, law < 0.5 ? 'тут на це дивляться крізь пальці' : 'тут за це суворо карають'),
+    O('Вчитися ночами', function () { add(s, { gpa: 6, smarts: 2, health: -2, happy: -3 }); return 'Невиспан' + g(s, 'ий', 'а') + ', але здано чесно.'; }),
+    O('Піти як є', function () { var d = (s.st.smarts - 55) / 3; add(s, { gpa: d }); return d >= 0 ? 'Склав' + g(s, '', 'ла') + ' нормально — без зайвих нервів.' : 'Оцінка гірша, ніж хотілося.'; })] };
+});
+ev('party', [14, 24], 3, function (s) { return !!s.study; }, function (s) {
+  return { text: 'Велика вечірка в ніч перед контрольною. Там буде людина, яка тобі подобається.', opts: [
+    O('Піти на всю ніч', function () { add(s, { happy: 6, social: 4, gpa: s.st.smarts > 70 ? -3 : -9 }); if (!s.partner && s.age >= 15 && chance(0.25 + s.st.social / 300)) { s.partner = newPartner(s); return 'Вечірка змінила все: ви з ' + s.partner.name + ' почали зустрічатися. Контрольна — провал.'; } if (chance(0.12)) { s.flags.drink = 1; return 'Вечірка вдалася. Але алкоголь почав ставати звичкою.'; } return 'Весело. Контрольна — так собі.'; }),
+    O('Зайти на годинку', function () { add(s, { happy: 3, social: 2, gpa: -2 }); return chance(0.5) ? 'Вийшло непогано: і відпочив' + g(s, '', 'ла') + ', і виспа' + g(s, 'вся', 'лася') + '.' : '«Годинка» розтягнулася до третьої ночі.'; }),
+    O('Вчитися', function () { add(s, { gpa: 6, social: -2, happy: -2 }); return 'Контрольна на відмінно. Про вечірку всі говорять ще тиждень.'; })] };
+});
+ev('bully', [7, 15], 3, function (s) { return !!s.study; }, function (s) {
+  var good = C(s).gdp > 25;
+  return { text: 'Старшокласник щодня відбирає в тебе гроші на обід.', opts: [
+    O('Битися', function () { if (chance(0.2 + s.sk.sport / 120 + s.st.health / 400)) { add(s, { social: 6, happy: 4 }); return 'Ти дав' + g(s, '', 'ла') + ' відсіч — більше не чіпають.'; } add(s, { health: -8, happy: -6 }); return 'Бійку програно, а вчителі покарали обох.'; }, 'спорт допомагає'),
+    O('Сказати вчителю', function () { if (chance(good ? 0.65 : 0.35)) { add(s, { happy: 3 }); return 'Вчителька розібралася — його перевели в інший клас.'; } add(s, { social: -5, happy: -5 }); return 'Нічого не змінилося, а тепер ще й дражнять «стукачем».'; }, good ? 'у школах тут на це реагують' : 'школі зазвичай байдуже'),
+    O('Спробувати з ним заприятелювати', function () { if (chance(0.15 + s.st.social / 200)) { add(s, { social: 6 }); s.friends++; return 'Несподівано — ви подружилися. Тепер ти під захистом.'; } add(s, { happy: -4 }); return 'Не вийшло. Платиш далі.'; }),
+    O('Мовчки платити', function () { s.money -= M(s) * 0.005; add(s, { happy: -6 }); return 'Рік ти віддавав' + g(s, '', 'ла') + ' гроші на обід.'; })] };
+});
+ev('crypto', [18, 55], 1.2, function (s) { return s.money > M(s) * 0.1; }, function (s) {
+  var coin = pick(['$FROG', '$MOON', 'NeuroCoin', 'MetaKitty', '$WAGMI']), r = R();
+  return { text: 'Знайомий клянеться, що ' + coin + ' «точно зробить х20». Він уже заробив — показує скріншоти.', opts: [
+    O('Вкласти 20% заощаджень', function () { var a = s.money * 0.2; s.money -= a; if (r < 0.6) return coin + ' обвалився на 95%. −' + fmt(a) + '.'; if (r < 0.88) { s.money += a * rnd(0.6, 1.6); return coin + ' погойдався — ти вийш' + g(s, 'ов', 'ла') + ' майже при своїх.'; } var w = a * rnd(4, 20); s.money += w; mark(s, 'Розбагатів' + g(s, '', 'ла') + ' на ' + coin); return coin + ' злетів! +' + fmt(w) + '.'; }),
+    O('Вкласти трохи, 3%', function () { var a = s.money * 0.03; s.money -= a; if (r < 0.6) return 'Втрачено ' + fmt(a) + '. Добре, що небагато.'; if (r < 0.88) { s.money += a; return 'Вийшов' + g(s, '', 'ла') + ' в нуль.'; } s.money += a * 10; return 'Злетів! Але від 3%… +' + fmt(a * 9) + '. Шкода, що не більше.'; }),
+    O('Не вʼязуватися', function () { if (r >= 0.88) { add(s, { happy: -4 }); return coin + ' справді злетів у 15 разів. Знайомий тепер на новому авто.'; } return 'Через місяць ' + coin + ' зник разом із сайтом. Знайомий більше не хвалиться.'; })] };
+});
+ev('friendloan', [20, 70], 2, function (s) { return s.money > M(s) * 0.2 && s.friends > 0; }, function (s) {
+  var a = M(s) * 0.15, rel = R();
+  return { text: 'Близький друг просить позичити ' + fmt(a) + ': «Віддам за пів року, чесно».', opts: [
+    O('Позичити всю суму', function () { s.money -= a; if (rel < 0.55) { s.money += a; add(s, { social: 3 }); return 'Друг повернув усе вчасно. Дружба міцнішає.'; } if (rel < 0.8) { s.money += a * 0.5; return 'Друг повернув половину і зник.'; } s.friends--; return 'Гроші не повернулися. Друга теж більше не бачиш.'; }),
+    O('Дати половину', function () { s.money -= a / 2; if (rel < 0.8) { s.money += a / 2; return 'Друг повернув. Але трохи образився, що не довіряєш.'; } return 'Половина пропала. Добре, що не вся.'; }),
+    O('Відмовити', function () { if (rel < 0.55 && chance(0.6)) { s.friends--; add(s, { happy: -3 }); return 'Друг образився — ви віддалилися.'; } return 'Друг зрозумів. Чи зробив вигляд.'; })] };
+});
+ev('boss', [18, 65], 2, function (s) { return s.job && !s.job.teen && s.job.lvl < 3; }, function (s) {
+  var c = C(s);
+  return { text: 'Начальник накричав на тебе при всіх через чужу помилку.', opts: [
+    O('Відповісти різко', function () { if (!s.job) return 'Вже неважливо.'; if (chance(0.2 + c.unemp)) { endJob(s, 'конфлікт'); return 'Тебе звільнили. На твоє місце черга — безробіття тут ' + Math.round(c.unemp * 100) + '%.'; } add(s, { social: 3 }); s.job.perf += 3; return 'Начальник вибачився. Колеги поважають.'; }),
+    O('Промовчати', function () { add(s, { happy: -5 }); if (s.job) s.job.perf -= 2; return 'Проковтну' + g(s, 'в', 'ла') + '. Осад залишився.'; }),
+    O('Скарга в HR / профспілку', function () { if (!s.job) return 'Вже неважливо.'; if (chance(c.law * 0.7)) { add(s, { happy: 4 }); return 'HR розібрався, начальнику зробили догану.'; } s.job.perf -= 8; return 'Скаргу «загубили», а начальник тепер тебе недолюблює.'; }, c.law > 0.7 ? 'тут це працює' : 'тут це рідко працює')] };
+});
+ev('burnout', [22, 62], 3, function (s) { return s.job && JOB[s.job.id] && (JOB[s.job.id].st >= 55 || (s.h.overtime || 0) > 8); }, function (s) {
+  return { text: 'Ти вигораєш: ранок починається з думки «не хочу».', opts: [
+    O('Взяти відпустку', function () { add(s, { happy: 8, health: 3 }); if (s.job) s.job.perf -= 6; return 'Два тижні тиші. Стало легше, хоч робота накопичилась.'; }),
+    O('Перейти на неповний день', function () { if (!s.job) return 'Вже неактуально.'; if (chance(0.5)) { s.job.part = true; add(s, { happy: 6 }); return 'Погодили неповний день: грошей менше, сил більше.'; } return 'Начальник відмовив.'; }),
+    O('Терпіти', function () { add(s, { happy: -8, health: -5 }); if (s.job) s.job.perf += 4; if (chance(0.2)) { s.flags.depr = 1; return 'Ти тягнеш, але щось усередині ламається.'; } return 'Стиснув' + g(s, '', 'ла') + ' зуби.'; }),
+    O('Звільнитися', function () { if (!s.job) return 'Ти вже не працюєш там.'; endJob(s, 'вигорання'); add(s, { happy: 6 }); return 'Ти пішов' + g(s, '', 'ла') + '. Без плану, але з полегшенням.'; })] };
+});
+ev('side', [18, 55], 1.5, null, function (s) {
+  return { text: 'Знайомий пропонує підробіток на вихідних: добрі гроші, але без вихідних на пів року.', opts: [
+    O('Погодитися', function () { s.money += M(s) * 0.15; add(s, { happy: -4, health: -1 }); if (s.partner) s.partner.rel -= 8; return 'Підробіток приніс ' + fmt(M(s) * 0.15) + (s.partner ? ', але ' + s.partner.name + ' почува' + gp(s.partner, 'вся', 'лася') + ' покинут' + gp(s.partner, 'им', 'ою') + '.' : '.'); }),
+    O('Тільки через вихідний', function () { s.money += M(s) * 0.06; add(s, { happy: -1 }); return 'Трохи грошей і трохи відпочинку.'; }),
+    O('Відмовитися', function () { add(s, { happy: 2 }); return 'Вихідні — твої.'; })] };
+});
+ev('crush', [12, 17], 4, null, function (s) {
+  var n = nameFrom(s.country, s.pref === 'same' ? s.sex : (s.sex === 'm' ? 'f' : 'm'));
+  return { text: g(s, 'Ти закохався', 'Ти закохалася') + ' в ' + n + '.', opts: [
+    O('Зізнатися прямо', function () { if (chance(0.3 + s.st.social / 150)) { add(s, { happy: 12 }); mark(s, 'Перше кохання: ' + n); return n + ' відповіли взаємністю!'; } add(s, { happy: -10, social: -2 }); return n + ' сказали «давай будемо друзями». Про це знає вся школа.'; }),
+    O('Спершу подружитися', function () { s.friends++; if (chance(0.35)) { add(s, { happy: 10 }); return 'Дружба переросла в щось більше.'; } return 'Ви стали друзями. Тільки друзями.'; }),
+    O('Мовчати', function () { add(s, { happy: -2 }); return 'Ти так і не наважи' + g(s, 'вся', 'лася') + '.'; })] };
+});
+
+// ---------- Нові: неприємності для заможних і бізнесу ----------
+ev('audit', [25, 80], 2, function (s) { return s.lastInc > M(s) * 3 || (s.lastShadow && s.age - s.lastShadow < 3); }, function (s) {
+  var c = C(s), dirty = s.lastShadow && s.age - s.lastShadow < 3, fine = s.lastInc * (dirty ? 0.4 : 0.1);
+  return { text: 'Податкова перевіряє твої доходи за три роки.' + (dirty ? ' Схоже, вони знають про заробітки «в конверті».' : ''), opts: [
+    O('Найняти податкового юриста', function () { var f2 = M(s) * 0.3; s.money -= f2; if (chance(dirty ? 0.4 : 0.8)) return 'Юрист усе владнав. Його послуги — ' + fmt(f2) + '.'; s.money -= fine * 0.6; return 'Навіть юрист не допоміг: донарахували ' + fmt(fine * 0.6) + '.'; }),
+    O('Розбиратися самостійно', function () { add(s, { happy: -5 }); if (chance(dirty ? 0.15 : 0.55)) return 'Тижні паперів — і перевірка нічого не знайшла.'; s.money -= fine; return 'Донарахували податки й штраф: ' + fmt(fine) + '.'; }),
+    O('«Вирішити» з інспектором', function () { var br = fine * 0.3; s.money -= br; if (chance(clamp(1 - c.law * 1.1 + (cartel(s) ? 0.2 : 0), 0.05, 0.9))) return 'Інспектор узяв ' + fmt(br) + ' і закрив перевірку.'; s.money -= fine * 2; s.record++; s.recordAge = s.age; return 'Це була перевірка на хабар. Штраф ' + fmt(fine * 2) + ' і кримінальна справа.'; })] };
+});
+ev('lawsuit', [20, 90], 2, function (s) { return s.biz.length > 0; }, function (s) {
+  var b = pick(s.biz), claim = b.cap * rnd(0.1, 0.4);
+  return { text: 'Клієнт подав до суду на «' + b.name + '» і вимагає ' + fmt(claim) + '. Каже, що ви зірвали замовлення.', opts: [
+    O('Судитися до кінця', function () { b.cash -= M(s) * 0.1; if (chance(0.45 + bizQ(s, b) / 300)) return 'Суд виграно. Адвокати коштували ' + fmt(M(s) * 0.1) + '.'; b.cash -= claim * 1.2; return 'Суд програно: ' + fmt(claim * 1.2) + ' разом із витратами.'; }),
+    O('Домовитися мирно', function () { b.cash -= claim * 0.45; return 'Мирова угода: ' + fmt(claim * 0.45) + '. Дорого, але швидко.'; }),
+    O('Ігнорувати', function () { if (chance(0.3)) return 'Позов так і не дійшов до суду.'; b.cash -= claim * 1.5; b.comp += 0.04; return 'Суд заочно: ' + fmt(claim * 1.5) + ', а про скандал написали в новинах.'; })] };
+});
+ev('embezzle', [25, 90], 1.5, function (s) { return s.biz.some(function (b) { return b.mgr || b.staff > 5; }); }, function (s) {
+  var b = pick(s.biz.filter(function (x) { return x.mgr || x.staff > 5; })), loss = b.cap * rnd(0.05, 0.25);
+  b.cash -= loss;
+  return { text: 'У «' + b.name + '» виявили крадіжку: хтось із ' + (b.mgr ? 'управителя' : 'працівників') + ' виводив гроші. Втрачено ' + fmt(loss) + '.', opts: [
+    O('Заява в поліцію', function () { if (chance(C(s).law * 0.8)) { b.cash += loss * 0.5; return 'Винного знайшли, частину грошей повернули.'; } return 'Справу відкрили — і на цьому все.'; }),
+    O('Тихо звільнити й посилити контроль', function () { b.comp += 0.02; s.money -= M(s) * 0.05; return 'Звільнили, поставили облік. Обійшлося без скандалу.'; }),
+    O('Взяти контроль на себе', function () { b.mgr = false; b.effort = 1; return 'Тепер ти сам' + g(s, '', 'а') + ' перевіряєш кожну гривню. Часу менше, втрат теж.'; })] };
+});
+ev('racket', [18, 80], 3, function (s) { return s.biz.length > 0 && C(s).law < 0.45; }, function (s) {
+  var b = pick(s.biz), fee = M(s) * 0.4;
+  return { text: 'До «' + b.name + '» прийшли «хлопці»: щомісячний «внесок за безпеку», інакше «всяке буває».', opts: [
+    O('Платити', function () { b.cash -= fee; return 'Тепер ти платиш данину ' + fmt(fee) + ' на рік. Зате спокійно.'; }),
+    O('Звернутися в поліцію', function () { if (chance(C(s).law)) return 'Поліція спрацювала — «хлопців» більше не видно.'; b.cap *= 0.75; add(s, { happy: -10 }); return 'Через тиждень у «' + b.name + '» сталася «пожежа».'; }),
+    O('Знайти «дах» серед знайомих', function () { if (chance(s.st.social / 120)) { b.cash -= fee * 0.4; return 'Знайомі «вирішили питання». Дешевше, але тепер ти їм винен' + g(s, '', 'на') + '.'; } b.cap *= 0.8; return 'Знайомі не допомогли. Вітрини розбили.'; })] };
+});
+ev('raider', [25, 80], 1, function (s) { return s.biz.some(function (b) { return b.cap > M(s) * 10; }) && C(s).law < 0.5; }, function (s) {
+  var b = s.biz.filter(function (x) { return x.cap > M(s) * 10; })[0];
+  return { text: 'Рейдери підробили документи й через «свій» суд намагаються переписати «' + b.name + '» на себе.', opts: [
+    O('Найняти сильних юристів', function () { var c2 = b.cap * 0.1; s.money -= c2; if (chance(0.55)) return 'Відбилися. Юристи коштували ' + fmt(c2) + '.'; closeBiz(s, b, 'рейдерське захоплення', 0); return 'Бізнес відібрали. Юристи не допомогли.'; }),
+    O('Домовитися з рейдерами', function () { var share = b.cap * 0.3; b.cap -= share; return 'Віддав' + g(s, '', 'ла') + ' частину активів — ' + fmt(share) + ' — щоб відчепилися.'; }),
+    O('Продати бізнес поки не пізно', function () { var v = bizValue(s, b) * 0.6; closeBiz(s, b, 'продано під тиском', v); return 'Продано за безцінь: ' + fmt(v) + '.'; })] };
+});
+ev('cyber', [20, 80], 2, function (s) { return s.biz.some(function (b) { return SECTOR[b.type] === 'IT' || b.type === 'online'; }); }, function (s) {
+  var b = s.biz.filter(function (x) { return SECTOR[x.type] === 'IT' || x.type === 'online'; })[0], ran = b.cap * 0.15;
+  return { text: 'Хакери зашифрували сервери «' + b.name + '» і вимагають ' + fmt(ran) + ' у крипті.', opts: [
+    O('Заплатити викуп', function () { b.cash -= ran; if (chance(0.7)) return 'Ключ прислали. Дані цілі.'; b.comp += 0.06; return 'Гроші взяли, ключ не прислали.'; }),
+    O('Відновлювати з резервних копій', function () { if (chance(0.25 + bizQ(s, b) / 200)) { b.cash -= ran * 0.2; return 'Бекапи врятували — простій кілька днів.'; } b.comp += 0.08; b.cash -= ran * 0.5; return 'Бекапи виявилися застарілими. Клієнти пішли.'; })] };
+});
+ev('crash_mkt', [20, 95], 1.5, function (s) { return s.inv.stk > M(s); }, function (s) {
+  return { text: 'Біржа падає: індекси −30% за місяць. У новинах — паніка.', opts: [
+    O('Продати все, поки не пізно', function () { var v = s.inv.stk * 0.72; s.inv.stk = 0; s.money += v; return 'Продано з втратою. Через рік ринок відновився — без тебе.'; }),
+    O('Тримати', function () { s.crash = 1; return 'Ти тримаєш. Нерви на межі.'; }),
+    O('Докупити на просіданні', function () { var a = s.money * 0.3; s.money -= a; s.inv.stk += a; s.crash = 1; return 'Ти докупив' + g(s, '', 'ла') + ' на ' + fmt(a) + '. Або геніально, або дуже дорого.'; })] };
+});
+
+// ---------- Нові: залежні від країни ----------
+ev('arranged', [19, 30], 5, function (s) { return ['IN', 'PK', 'BD', 'NP', 'AF'].indexOf(s.birth) >= 0 && !s.partner && !s.immigrant; }, function (s) {
+  var p = newPartner(s);
+  return { text: 'Батьки знайшли тобі пару: ' + p.name + ', ' + p.age + ' р., ' + p.occ + ', «з хорошої родини». Весілля хочуть уже цього року.', opts: [
+    O('Погодитися', function () { p.married = true; p.rel = ri(35, 70); p.compat = ri(-10, 30); s.partner = p; s.marriages++; s.parents.forEach(function (x) { x.rel += 15; }); mark(s, 'Шлюб за домовленістю: ' + p.name); return 'Весілля на 500 гостей. З ' + p.name + ' ви ще вчитеся одне одного.'; }),
+    O('Попросити час познайомитися', function () { if (chance(0.5)) { p.rel = ri(55, 80); s.partner = p; return 'Ви почали зустрічатися — і, здається, це може бути щось справжнє.'; } s.parents.forEach(function (x) { x.rel -= 5; }); return 'Родина нареченої образилася й відмовилася.'; }),
+    O('Відмовитися', function () { s.parents.forEach(function (x) { x.rel -= 20; }); add(s, { happy: -4 }); return 'Батьки довго не розмовляли з тобою. Але вибір — твій.'; })] };
+}, true);
+ev('gaokao', [16, 17], 8, function (s) { return ['CN', 'KR', 'JP'].indexOf(s.country) >= 0 && s.study && s.study.t === 'school'; }, function (s) {
+  return { text: s.country === 'CN' ? 'Рік до гаокао — іспиту, що визначає університет і, як кажуть, усе життя.' : s.country === 'KR' ? 'Рік до суинику. Батьки пропонують вечірні курси (хагвон) до 23:00.' : 'Рік вступних іспитів. Однокласники ходять на курси дзюку щовечора.', opts: [
+    O('Вчитися по 14 годин', function () { add(s, { gpa: 15, smarts: 3, health: -6, happy: -10, social: -4 }); if (chance(0.15)) s.flags.depr = 1; return 'Ти майже не бачиш сонця. Бал — дуже високий.'; }),
+    O('Вчитися, але берегти себе', function () { add(s, { gpa: 6, happy: -3 }); return 'Звичайний виснажливий рік.'; }),
+    O('Не гнатися за рейтингом', function () { add(s, { happy: 4, gpa: -5 }); s.parents.forEach(function (x) { x.rel -= 8; }); return 'Батьки розчаровані, але ти спиш по 8 годин.'; })] };
+}, true);
+ev('karoshi', [22, 60], 4, function (s) { return ['JP', 'KR', 'CN'].indexOf(s.country) >= 0 && s.job && !s.job.teen; }, function (s) {
+  return { text: 'У компанії не прийнято йти додому раніше за начальника. Він сидить до 22:00.', opts: [
+    O('Сидіти разом з усіма', function () { if (s.job) s.job.perf += 8; add(s, { health: -4, happy: -5 }); if (s.partner) s.partner.rel -= 6; return 'Ти «свій» у колективі. Удома тебе майже не бачать.'; }),
+    O('Йти вчасно', function () { if (s.job) s.job.perf -= 10; add(s, { happy: 3 }); return 'На тебе косо дивляться, і підвищення відкладається.'; })] };
+});
+ev('medbill', [18, 85], 3, function (s) { return C(s).health === 'paid' && !s.job; }, function (s) {
+  var bill = M(s) * rnd(0.3, 1.2);
+  return { text: 'Швидка, ніч у лікарні, аналізи — рахунок на ' + fmt(bill) + '. Страховки в тебе немає.', opts: [
+    O('Платити повністю', function () { s.money -= bill; return 'Оплачено. Заощаджень майже не лишилося.'; }),
+    O('Торгуватися з лікарнею', function () { if (chance(0.5 + s.st.social / 300)) { s.money -= bill * 0.5; return 'Після десятка дзвінків рахунок урізали вдвічі.'; } s.money -= bill; return 'Лікарня не поступилася.'; }),
+    O('Не платити', function () { s.debt += bill * 1.3; s.credit = clamp(s.credit - 20); return 'Рахунок передали колекторам. Кредитний рейтинг упав.'; })] };
+});
+ev('inflation', [18, 90], 4, function (s) { return ['AR', 'TR', 'NG', 'EG', 'LK', 'IR', 'VE', 'ZW', 'UA', 'PK', 'GH'].indexOf(s.country) >= 0 && s.money > M(s) * 0.3; }, function (s) {
+  return { text: 'Інфляція понад 50% на рік: ціни в магазині міняються щотижня, заощадження в місцевій валюті тануть.', opts: [
+    O('Тримати в національній валюті', function () { var l = s.money * 0.25; s.money -= l; return 'За рік гроші знецінилися на ' + fmt(l) + '.'; }),
+    O('Купити долари', function () { var l = s.money * 0.05; s.money -= l; return 'Обмін «з рук» коштував ' + fmt(l) + ', але решта вціліла.'; }),
+    O('Вкласти в речі й ремонт', function () { var a = s.money * 0.3; s.money -= a; if (s.own) s.own.homeLvl = Math.min(3, s.own.homeLvl + 1); add(s, { happy: 3 }); return 'Гроші перетворилися на речі. Зате не згоріли.'; })] };
+});
+ev('gulf', [20, 40], 4, function (s) { return ['IN', 'PK', 'BD', 'NP', 'PH', 'LK', 'EG'].indexOf(s.country) >= 0 && !s.immigrant && s.edu <= 4; }, function (s) {
+  return { text: 'Агентство пропонує контракт на будівництві в Перській затоці: зарплата втричі більша, ніж удома, але 3 роки без родини і 45° у тіні.', opts: [
+    O('Поїхати', function () { var fee = M(s) * 0.4; s.money -= fee; if (chance(0.2)) { add(s, { happy: -10 }); return 'Агентство виявилося шахрайським: гроші за «візу» пропали.'; } var r = emigrate(s, chance(.5) ? 'AE' : 'SA', 'трудовий контракт'); var j = JOB.builder; takeJob(s, j); return r; }, 'потрібно ' + fmt(M(s) * 0.4) + ' на агентство'),
+    O('Залишитися вдома', function () { return 'Родина поруч. Гроші — ні.'; })] };
+});
+ev('earthquake', [0, 95], 1, function (s) { return ['TR', 'JP', 'IR', 'NP', 'PK', 'AF', 'CL', 'PE', 'MX', 'ID', 'PH', 'IT', 'GR'].indexOf(s.country) >= 0; }, function (s) {
+  var h = ri(0, 20); add(s, { health: -h, happy: -10 }); if (s.home) s.home.val *= rnd(0.6, 0.95); s.money -= Math.min(s.money, M(s) * 0.2);
+  return 'Землетрус. Будинок вистояв' + (s.home ? ', але потріскався — ціна впала.' : '.') + (h > 12 ? ' Тебе поранило уламками.' : '') + ' Тиждень у наметі на подвірʼї.';
+});
+ev('drought', [5, 90], 3, function (s) { return ['ML', 'NE', 'ET', 'SD', 'KE', 'MG', 'AF', 'YE'].indexOf(s.country) >= 0 && !s.urban; }, function (s) {
+  return { text: 'Третій рік посухи. Урожаю майже немає, худоба гине.', opts: [
+    O('Переїхати до міста', function () { s.urban = true; s.withParents = s.age < 18; add(s, { happy: -5 }); if (s.job && s.job.id === 'farmer') endJob(s, 'посуха'); return 'Ви переїхали на околицю міста. Тісно, але є робота.'; }),
+    O('Пересидіти', function () { add(s, { health: -8, happy: -6 }); s.money -= Math.min(s.money, M(s) * 0.2); return 'Голодний рік. Ви вижили.'; })] };
+});
+ev('childbenefit', [18, 60], 6, function (s) { return C(s).gdp > 35 && s.kids.some(function (k) { return k.alive && k.age < 18; }); }, function (s) {
+  var n = s.kids.filter(function (k) { return k.alive && k.age < 18; }).length, a = M(s) * 0.06 * n;
+  s.money += a; return (s.country === 'PL' ? 'Виплата «800+»' : s.country === 'DE' ? 'Kindergeld' : 'Державна допомога на дітей') + ' за рік: ' + fmt(a) + '.';
+});
+ev('permit', [18, 70], 5, function (s) { return s.immigrant && s.immYrs <= 6 && C(s).gdp > 20; }, function (s) {
+  return { text: 'Час продовжувати дозвіл на проживання. Черга в міграційній службі — на місяці вперед.', opts: [
+    O('Найняти юриста', function () { s.money -= M(s) * 0.08; return 'Юрист усе зробив за ' + fmt(M(s) * 0.08) + '.'; }),
+    O('Робити самостійно', function () { if (chance(0.25 + workLang(s, s.country) * 0.5)) { add(s, { happy: -3 }); return 'Три візити, купа довідок — і дозвіл є.'; } s.money -= M(s) * 0.15; add(s, { happy: -8 }); if (s.job && chance(0.3)) { endJob(s, 'документи'); return 'Через помилку в документах дозвіл затримали, і роботодавець тебе звільнив.'; } return 'Через помилку в документах довелося платити штраф і подаватися знову.'; }, 'краще знати мову')] };
+});
+ev('envelope', [18, 90], 3, function (s) { return C(s).law < 0.55 && (s.flags.ill || s.parents.some(function (p) { return p.ill; })); }, function (s) {
+  var e = M(s) * 0.05;
+  return { text: 'Лікар натякає, що «з подякою» лікування буде кращим і швидшим.', opts: [
+    O('Дати конверт ' + fmt(e), function () { s.money -= e; if (chance(0.75)) { s.st.health = clamp(s.st.health + 6); return 'Тебе поклали в кращу палату й лікують уважніше.'; } return 'Конверт узяли — нічого не змінилося.'; }),
+    O('Обійтися без цього', function () { if (chance(0.5)) return 'Лікували як усіх — нормально.'; add(s, { health: -3 }); return 'Черги, черги і ще раз черги.'; })] };
+});
+ev('whistle', [25, 65], 1.5, function (s) { return s.job && !s.job.teen && s.job.lvl >= 1; }, function (s) {
+  return { text: 'Ти помітив' + g(s, '', 'ла') + ', що керівництво підробляє звіти й обманює клієнтів.', opts: [
+    O('Повідомити регулятору', function () { if (chance(C(s).law * 0.8)) { s.fame = clamp(s.fame + 10); add(s, { happy: 5 }); return 'Розслідування підтвердило — тебе називають сміливою людиною.'; } endJob(s, 'викривач'); add(s, { happy: -8 }); return 'Справу замʼяли, а тебе звільнили «за скороченням».'; }),
+    O('Поговорити з керівником', function () { if (chance(0.3)) { if (s.job) s.job.perf += 5; return 'Керівник усе виправив і тихо подякував.'; } if (s.job) s.job.perf -= 15; return 'Керівник дав зрозуміти, що тобі тут не раді.'; }),
+    O('Мовчати', function () { add(s, { happy: -3 }); if (chance(0.15)) { endJob(s, 'скандал'); return 'Через рік компанія впала зі скандалом — і ти без роботи.'; } return 'Ти вдаєш, що нічого не бачив' + g(s, '', 'ла') + '.'; })] };
+});
+ev('colleague', [22, 60], 2, function (s) { return s.job && JOB[s.job.id] && JOB[s.job.id].max && s.job.lvl < JOB[s.job.id].max && s.friends > 0; }, function (s) {
+  return { text: 'Звільняється посада вище. Претендентів двоє: ти і твій друг з відділу.', opts: [
+    O('Боротися за посаду', function () { if (!s.job) return 'Вже неактуально.'; if (chance(s.job.perf / 120)) { s.job.lvl++; s.job.lvlYrs = 0; s.friends--; return 'Посада твоя. Друг більше не ходить з тобою на обід.'; } add(s, { happy: -4 }); return 'Обрали друга. Ніяково обом.'; }),
+    O('Поступитися другові', function () { add(s, { social: 4 }); if (chance(0.4) && s.job) s.job.perf += 10; return 'Друг отримав посаду і не забув, хто йому допоміг.'; })] };
+});
+// Лишаємо тільки останні визначення подій з однаковими id
+(function () { var seen = {}; for (var i = EVENTS.length - 1; i >= 0; i--) { if (seen[EVENTS[i].id]) EVENTS.splice(i, 1); else seen[EVENTS[i].id] = 1; } })();

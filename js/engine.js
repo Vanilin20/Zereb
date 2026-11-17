@@ -106,7 +106,6 @@ function newLife(o) {
   var fam = s.parents.map(function (p) { return p.role.toLowerCase() + ' ' + p.name + ' (' + p.age + ')'; }).join(', ');
   say(s, 'Батьки: ' + fam + (s.flags.oneParent ? '. Тата поруч немає.' : '.') + (older ? ' Старших братів і сестер: ' + older + '.' : ''));
   mark(s, 'Народження: ' + c.name);
-  if (!o.nopeer) makePeers(s);
   s.ap = 0;
   return s;
 }
@@ -124,7 +123,8 @@ function langLevel(s, L) { return L === 'en' ? s.sk.eng : ((s.lang && s.lang[L])
 // Наскільки добре ти можеш працювати в країні мовою (0-1)
 function workLang(s, code) { var c = COUNTRIES[code]; var l = langLevel(s, c.lang); if (c.engOk) l = Math.max(l, s.sk.eng * 0.85); return clamp(l, 0, 100) / 100; }
 function immFactor(s) { if (!s.immigrant) return 1; return Math.min(1, 0.5 + 0.04 * s.immYrs + workLang(s, s.country) * 0.5); }
-function taxRate(s, gross) { var c = C(s); if (!c.tax) return 0; return c.tax * Math.max(0.6, Math.min(1.6, 0.6 + gross / (c.median * 3))); }
+function taxRate(s, gross) { var c = C(s); if (!c.tax) return 0; if (c.flat) return c.tax; if (gross <= 0) return 0; return Math.min(c.top * 0.92, c.tax * Math.max(0.55, 0.6 + 0.4 * Math.log2(1 + gross / c.median))); }
+function corpTax(s, b) { var c = C(s); if (c.code === 'UA' && b.cap < c.median * 10) return 0.05; return c.corp; }   // в Україні малий бізнес — ФОП, єдиний податок ~5%
 function jobBase(s, j) { var c = C(s); var base = c.median; if (j.g) base = Math.max(c.median, c.median * (1 - j.g) + 22000 * j.g); return base * j.pay; }
 function fameMult(f) { return 0.4 + 0.02 * f + (f > 70 ? Math.pow(f - 70, 2) * 0.02 : 0); }
 function jobPay(s) {
@@ -235,6 +235,7 @@ function offerChance(s, j) {
   if (s.age >= 16 && s.age < 25 && C(s).unemp > 0.1) p *= 0.85;   // молодіжне безробіття
   p *= immFactor(s);
   if (s.age > 55) p *= 0.7;
+  p *= 1 + Math.min(0.2, s.friends * 0.03);   // знайомі підказують вакансії
   if (hasRecord(s)) p *= 0.6;
   if (cf(s) === 2) p *= 0.85;
   return clamp(p, 0.03, 0.97);
@@ -278,7 +279,7 @@ function bizQ(s, b) {
   T.rel.jobs.forEach(function (id) { rel = Math.max(rel, Math.min(10, yearsIn(s, id)) * 7); });
   var sk = s.sk[T.rel.skill] || 0;
   var q = 0.25 * s.st.smarts + 0.25 * s.sk.biz + 0.2 * Math.max(rel, sk) + 0.15 * Math.min(100, s.bizYears * 8) + 0.15 * s.st.social
-    + (s.fields.indexOf('econ') >= 0 ? 6 : 0) + (b.effort >= 1 ? 5 : (b.mgr ? 0 : -8)) + (b.mgr ? 4 : 0) + (b.focus ? 8 : 0);
+    + (s.fields.indexOf('econ') >= 0 ? 6 : 0) + (b.effort >= 1 ? 5 : (b.mgr ? 0 : -8)) + (b.mgr ? 4 : 0) + (b.focus ? 8 : 0) - Math.max(0, s.biz.filter(function (x) { return !x.mgr; }).length - 1) * 6;
   return clamp(q);
 }
 function bizReadyLabel(q) { return q < 30 ? 'слабка' : q < 45 ? 'середня' : q < 60 ? 'добра' : 'відмінна'; }
@@ -326,21 +327,30 @@ function closeBiz(s, b, how, value) {
 }
 function bizTick(s, out) {
   var c = C(s), ownerPay = 0;
+  s.sectorShock = {};
+  if (s.biz.length) Object.keys(SECTOR).forEach(function (k) { var sec = SECTOR[k]; if (s.sectorShock[sec] != null) return; var r = R(); s.sectorShock[sec] = r < 0.12 ? -0.18 : r < 0.22 ? 0.07 : 0; });
+  Object.keys(s.sectorShock).forEach(function (sec) { if (s.sectorShock[sec] < 0 && s.biz.some(function (b) { return SECTOR[b.type] === sec; })) say(s, 'Поганий рік для сфери «' + sec + '»: клієнтів поменшало.', 'bad'); });
   s.biz.slice().forEach(function (b) {
     var T = BIZM[b.type], q = bizQ(s, b);
+    var active = s.biz.filter(function (x) { return !x.mgr; }).length, eff = b.mgr ? b.effort : b.effort / Math.max(1, active);   // одна людина не може повністю тягнути кілька бізнесів
     var roi = T.roi + (b.loc || 0) + (q - 35) / 200 - (b.yrs === 0 ? T.ramp : 0) + s.econ * T.cyc + gauss() * T.vol - b.comp;
     if (s.econ > 0) roi = T.roi + (q - 35) / 200 - (b.yrs === 0 ? T.ramp : 0) + 0.04 + gauss() * T.vol - b.comp;
     b.comp *= 0.6;
     var sat = BIZM[b.type].cost * c.median * (BIZ_SCALE[b.type] || 20);
-    if (b.cap > sat) roi -= 0.12 * Math.log2(b.cap / sat);   // ринок не безмежний
+    if (b.cap > sat) roi -= 0.15 * Math.log2(b.cap / sat);   // ринок не безмежний
+    var sec = SECTOR[b.type] || 'інше', sh = s.sectorShock && s.sectorShock[sec] || 0; roi += sh;
+    var sameSec = s.biz.filter(function (x) { return x !== b && SECTOR[x.type] === sec; }).length;
+    var otherSec = {}; s.biz.forEach(function (x) { if (x !== b && SECTOR[x.type] !== sec) otherSec[SECTOR[x.type]] = 1; });
+    roi += Math.min(0.05, Object.keys(otherSec).length * 0.02) - sameSec * 0.04;   // різні сфери підтримують одна одну, однакові — конкурують
     var prof = b.cap * roi;
     if (b.mgr) prof -= c.median * 0.8;
     if (b.staff) { var prod = 0.9 + q / 160 + gauss() * 0.15 + (s.econ < 0 ? -0.25 : s.econ > 0 ? 0.08 : 0) - (b.cap > sat ? 0.1 * Math.log2(b.cap / sat) : 0) - Math.max(0, b.staff - 20) * 0.003; prof += b.staff * c.median * 0.9 * (prod - 1); }
     if (b.fran != null) { if (chance(clamp((q - 40) / 100 + 0.1, 0.02, 0.6))) { var nf = ri(1, 2); b.fran += nf; say(s, '«' + b.name + '»: +' + nf + ' франчайзі. Усього: ' + b.fran + '.', 'good'); } if (b.fran > 0 && q < 35 && chance(0.15)) { b.fran--; say(s, 'Франчайзі пішов від «' + b.name + '» — бренд слабшає.', 'bad'); } b.fran = Math.min(b.fran, (BIZ_SCALE[b.type] || 20) * 2); prof += b.fran * c.median * 0.25; }
+    var ctax = prof > 0 ? prof * corpTax(s, b) : 0; prof -= ctax; s.yrTax = (s.yrTax || 0) + ctax;
     b.cash += prof; b.last = prof; b.hist.push(prof); b.yrs++; s.bizYears++;
     if (roi > 0 && b.cap < sat) b.cap *= 1 + roi * 0.25;
     b.focus = false;
-    if (b.effort > 0) ownerPay += c.median * (0.7 + q / 60) * (T.pay || 1) * Math.sqrt(Math.min(4, b.cap / (BIZM[b.type].cost * c.median))) * b.effort * (b.mgr ? 0.3 : 1);
+    if (eff > 0) ownerPay += c.median * (0.7 + q / 60) * (T.pay || 1) * Math.sqrt(Math.min(4, b.cap / (BIZM[b.type].cost * c.median))) * eff * (b.mgr ? 0.3 : 1);
     var res = 0.2 * b.cap;
     if (b.cash > res) { var d = (b.cash - res) * b.div; b.cash -= d; s.money += d * (b.share || 1); b.paid += d * (b.share || 1); }
     add(s, { biz: 2 + (b.effort >= 1 ? 2 : 0) });
@@ -568,7 +578,12 @@ function familyTick(s) {
     k.age++; k.rel = clamp(k.rel - 2 + (s.h.kids || 0) * 2);
     var hz = k.age < 5 ? c.qc * [1.5, 1.2, 1, 0.7, 0.45][Math.min(4, Math.max(0, wealthQ(s) - 1))] : hazard(c, k.age);
     if (chance(hz)) { k.alive = false; add(s, { happy: -30 }); say(s, 'Помер' + gp(k, '', 'ла') + ' ' + gp(k, 'твій син', 'твоя донька') + ' ' + k.name + '. Це найважчий день у твоєму житті.', 'bad'); mark(s, 'Втрата дитини'); return; }
-    if (k.age === 18) say(s, gp(k, 'Син', 'Донька') + ' ' + k.name + ' виріс' + gp(k, '', 'ла') + ' і живе окремо.');
+    if (k.age === 18) {
+      // майбутнє дитини залежить від твого доходу, освіти й часу, який ти їй давав
+      var kp = clamp(0.15 + C(s).sec * 0.35 + (wealthQ(s) - 3) * 0.08 + (s.edu >= 5 ? 0.12 : 0) + (k.rel - 50) / 200 + (k.edu ? 0.15 : 0), 0.03, 0.95);
+      k.uni = chance(kp);
+      say(s, gp(k, 'Син', 'Донька') + ' ' + k.name + ' виріс' + gp(k, '', 'ла') + (k.uni ? ' і вступи' + gp(k, 'в', 'ла') + ' до університету.' : ' і пішов' + gp(k, '', 'ла') + ' працювати після школи.') + (k.rel < 35 ? ' Спілкуєтесь ви рідко.' : ''), k.uni ? 'good' : '');
+    }
     if (k.age >= 22 && chance(0.07)) { s.grandkids++; say(s, 'У ' + k.name + ' народилася дитина — у тебе ' + (s.grandkids === 1 ? 'перший онук!' : s.grandkids + '-й онук.'), 'good'); add(s, { happy: 6 }); if (s.grandkids === 1) mark(s, 'Перший онук'); }
   });
 }
@@ -578,7 +593,7 @@ function wealthQ(s) { var r = s.hhInc / M(s); return r < 0.4 ? 1 : r < 0.8 ? 2 :
 function finTick(s, ownerPay, side) {
   var c = C(s), inc = 0;
   var jpG = jobPay(s), jp = jpG * (1 - taxRate(s, jpG)), opG = ownerPay; ownerPay = opG * (1 - taxRate(s, opG) * 0.8);
-  s.lastTax = jpG - jp + opG - ownerPay;
+  s.lastTax = jpG - jp + opG - ownerPay + (s.yrTax || 0); s.yrTax = 0;
   side = (side || 0) * (1 - taxRate(s, side) * 0.5);
   inc += jp + ownerPay + side + (s.shadow || 0); s.shadow = 0;
   if (s.retired) inc += pension(s);
@@ -589,9 +604,15 @@ function finTick(s, ownerPay, side) {
   var pshare = 0;
   if (s.partner && (s.partner.married || s.partner.yrs >= 2) && s.age >= 18) pshare = s.partner.inc * 0.5;
   // інвестиції
+  var g0 = s.inv.dep + s.inv.stk + s.inv.cry;
   s.inv.dep *= 1.012 + R() * 0.01;
-  var sr = 0.055 + 0.16 * gauss() + s.econ * 0.12; s.inv.stk *= Math.max(0.45, 1 + sr);
+  var sr = 0.055 + 0.16 * gauss() + s.econ * 0.12 + (s.crash ? -0.35 : 0); s.inv.stk *= Math.max(0.45, 1 + sr); s.crash = 0;
   var cr = Math.exp(-0.15 + 0.6 * gauss()); s.inv.cry *= cr;
+  var gain = s.inv.dep + s.inv.stk + s.inv.cry - g0;
+  if (gain > 0) { var gt = gain * c.capTax; s.inv.dep -= gt * 0.2; s.inv.stk -= gt * 0.5; s.inv.cry -= gt * 0.3; if (s.inv.dep < 0) s.inv.dep = 0; s.lastTax += gt; }
+  var prop = ((s.home ? s.home.val : 0) + s.rentals.reduce(function (a, r) { return a + r.val; }, 0)) * c.propTax;
+  var wt = c.wealthTax && netWorth(s) > c.median * 25 ? (netWorth(s) - c.median * 25) * c.wealthTax : 0;
+  inc -= prop + wt; s.lastTax += prop + wt;
   if (s.inv.cry > 10 && cr > 2.5) say(s, 'Крипта злетіла: твій портфель ×' + cr.toFixed(1) + '!', 'good');
   if (s.inv.cry > 10 && cr < 0.35) say(s, 'Крипторинок обвалився: портфель −' + Math.round((1 - cr) * 100) + '%.', 'bad');
   // витрати
@@ -636,7 +657,7 @@ function jobTick(s) {
   var j = JOB[s.job.id];
   s.job.yrs++; s.job.lvlYrs++; s.wy[j.id] = (s.wy[j.id] || 0) + 1; s.workYears++;
   var rel = 0; hobbyFor(j.id).forEach(function (k) { s.sk[k] = clamp(s.sk[k] + (s.sk[k] < 70 ? 2 : 0.8)); rel = Math.max(rel, s.sk[k]); });
-  s.job.perf = clamp(s.job.perf * 0.5 + 25 + (s.st.smarts - 50) * 0.3 + rel / 6 + rnd(-12, 12) + (s.h.overtime || 0) * 1.6 - (s.study && !s.job.part ? 8 : 0) + (s.st.health < 35 ? -10 : 0) + (s.sleep ? 0 : 6) - (s.flags.depr ? 10 : 0));
+  s.job.perf = clamp(s.job.perf * 0.5 + 25 + (s.st.smarts - 50) * 0.3 + rel / 6 + rnd(-12, 12) + (s.h.overtime || 0) * 1.6 - (s.study && !s.job.part ? 8 : 0) + (s.st.health < 35 ? -10 : 0) + (s.sleep ? 0 : 6) - (s.flags.depr ? 10 : 0) + (s.st.happy - 50) / 8 + (s.st.health - 50) / 12 - (s.stress > 60 ? 5 : 0));
   if (j.max && s.job.lvl < j.max && s.job.lvlYrs >= 3 && s.job.perf > 65 && chance(0.12 + (s.job.perf - 65) / 80)) {
     s.job.lvl++; s.job.lvlYrs = 0; add(s, { happy: 6 });
     say(s, 'Підвищення! Тепер ти ' + lvName(j, s.job.lvl).toLowerCase() + ' (' + j.n.toLowerCase() + ').', 'good');
@@ -667,8 +688,13 @@ function statsTick(s) {
   if (s.friends > 0 && (s.h.friends || 0) < 2 && chance(0.12)) { s.friends--; }
   if (!(s.job && JOB[s.job.id] && JOB[s.job.id].vol) && !(s.h.blog > 0)) s.fame *= 0.93;
   if (s.flags.smoker && s.age > 25 && s.used.quitsmoke) { }
+  // стрес: багато роботи, борги, хвороби
+  var workH = (s.job && !s.job.teen ? (s.job.part ? 20 : 40) : 0) + (s.h.overtime || 0) + s.biz.reduce(function (a, b) { return a + (b.mgr ? 4 : b.effort >= 1 ? 45 : 22); }, 0);
+  s.stress = clamp((workH - 40) * 1.5 + (s.debt > c.median ? 20 : 0) + (s.chronic ? s.chronic.length * 5 : 0) + (s.h.rest < 6 ? 15 : 0) + (s.job ? (JOB[s.job.id] ? JOB[s.job.id].st - 50 : 0) : 0));
+  if (s.stress > 60) { add(s, { health: -2 }); if (s.partner) s.partner.rel -= 4; }
+  if (s.edu >= 5) s.st.health = clamp(s.st.health + 0.3);
   // щастя
-  var t = 52;
+  var t = 52 - Math.max(0, s.stress - 40) / 4;
   if (s.age >= 18) {
     var hh = Math.max(1, s.hhInc);
     t += clamp(Math.log(hh / c.median) * 6, -12, 10) + clamp(Math.log(hh / 8000) * 2.5, -6, 6);
@@ -778,7 +804,6 @@ function ageUp(s) {
   if (s.flags.ill && !s.flags.illTreated) add(s, { health: -3 });
   if (s.flags.ill && s.flags.illTreated && chance(0.15 + 0.4 * C(s).hq)) { s.flags.ill = false; s.flags.illTreated = false; say(s, 'Лікування допомогло — хворобу подолано.', 'good'); }
   if (s.flags.ill && !s.flags.illKnown && chance(0.3)) { s.flags.illKnown = true; out.push(illnessPrompt(s)); }
-  if (!s.peer) { peerTick(s); if ([5, 15, 30, 50, 70].indexOf(s.age) >= 0) out.push({ checkpoint: true, title: 'Тобі ' + s.age, text: '', opts: [{ t: 'Далі', f: function () { return ''; } }] }); }
   if (s.age === 18 && C(s).consc && (s.sex === 'm' || C(s).consc === 2) && !s.study && !s.immigrant && !s.prison) out.push(conscription(s));
   pickEvents(s, out);
   if (s.st.health <= 0) die(s, 'виснаження організму');
@@ -912,39 +937,6 @@ function mentalTick(s) {
   if (s.st.happy < 25) s.lowYrs++; else s.lowYrs = Math.max(0, s.lowYrs - 1);
   if (!s.flags.depr && s.lowYrs >= 2 && chance(0.5)) { s.flags.depr = 1; say(s, 'Пригнічений стан: важко радіти, важко працювати. Тут допоможе психотерапія, близькі люди й час.', 'bad'); }
   if (s.flags.depr && s.st.happy > 55 && chance(0.4)) { s.flags.depr = 0; say(s, 'Пригнічений стан відступив.', 'good'); }
-}
-
-// ---------- Ровесники: ще 4 немовляти, народжені тієї ж секунди ----------
-function makePeers(s) {
-  s.peers = [];
-  for (var i = 0; i < 4; i++) { var p = newLife({ nopeer: true }); p.nolog = true; p.log = []; p.cur = null; p.tl = []; p.peer = 1; s.peers.push(p); }
-}
-function autoResolve(p, pr, depth) {
-  if (!pr || typeof pr !== 'object' || depth > 4) return;
-  var ok = pr.opts.filter(function (o) { return !o.dis && !/Вкрасти|Афера|Погодитися на «легкі|Взяти гроші|хабар|Домовитися»/i.test(o.t); });
-  if (!ok.length) ok = pr.opts.filter(function (o) { return !o.dis; });
-  if (!ok.length) return;
-  var o = chance(0.55) ? ok[0] : pick(ok);
-  var r = o.f(); normMoney(p);
-  if (r && typeof r === 'object') autoResolve(p, r, (depth || 0) + 1);
-}
-function peerTick(s) {
-  if (!s.peers) return;
-  s.peers.forEach(function (p) {
-    if (!p.alive) return;
-    if (p.age >= 6 && !p._sch) { p.sched = { sport: ri(0, 5), friends: ri(2, 6), read: ri(0, 4), family: 2 }; p._sch = 1; }
-    if (p.age === 16 && p.d >= 5 && !p.sched.h_code && chance(0.3)) p.sched[pick(['h_code', 'h_music', 'h_art', 'h_cook', 'h_craft'])] = ri(2, 6);
-    if (p.age >= 16 && !p.job && !p.study && !p.retired && !p.prison && chance(0.8)) { var jo = jobOptions(p, 3); if (jo.opts.length && jo.opts[0].f) autoResolve(p, { opts: shuffle(jo.opts).slice(0, 3) }, 0); }
-    if (p.age >= C(p).retAge && !p.retired && chance(0.5)) { if (p.job) endJob(p, 'пенсія'); p.retired = true; }
-    if (p.age >= 24 && !p.partner && chance(0.3)) { p.partner = newPartner(p); }
-    if (p.partner && !p.partner.married && p.partner.yrs >= 2 && chance(0.3)) { p.partner.married = true; p.marriages++; }
-    if (p.partner && p.age < 40 && p.kids.length < Math.round(C(p).tfr) && chance(0.25 * (fertility(p) || 0.3))) { var sx = chance(.5) ? 'm' : 'f'; p.kids.push({ name: nameFrom(p.country, sx), sex: sx, age: 0, alive: true, rel: 70 }); }
-    var out = ageUp(p);
-    out.forEach(function (pr) { autoResolve(p, pr, 0); });
-  });
-}
-function peerCard(p) {
-  return { flag: COUNTRIES[p.country].flag, name: p.first + ' ' + p.last, country: COUNTRIES[p.birth].name, age: p.age, alive: p.alive, cause: p.cause, title: p.alive ? jobTitle(p) : 'помер' + (p.sex === 'f' ? 'ла' : '') + ' у ' + p.age + ' (' + p.cause + ')', edu: EDU_NAMES[p.edu], net: netWorth(p), inc: p.lastInc, kids: p.kids.length, d: p.d };
 }
 
 // ---------- Підсумок ----------

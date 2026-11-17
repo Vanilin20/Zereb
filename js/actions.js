@@ -162,7 +162,7 @@ A({ id: 'date', tab: 'love', n: 'Знайомства', d: 'Шукати пар�
 function datePrompt(s, tries) {
   var p = newPartner(s);
   return { title: 'Знайомство', text: p.name + ', ' + p.age + ' р., ' + p.occ + '. Здається, між вами щось є.', opts: [
-    { t: 'Запросити на побачення', sub: 'шанс залежить від харизми', f: function () { if (chance(0.35 + s.st.social / 150 + p.compat / 200)) { s.partner = p; add(s, { happy: 10 }); if (!s.flags.firstRel) { s.flags.firstRel = 1; mark(s, 'Перші стосунки: ' + p.name); } return 'Ви з ' + p.name + ' почали зустрічатися.'; } add(s, { happy: -4 }); return p.name + ' відмовил' + gp(p, 'ов', 'а') + '.'; } },
+    { t: 'Запросити на побачення', sub: 'шанс залежить від харизми', f: function () { if (chance(0.3 + s.st.social / 150 + p.compat / 200 + s.fame / 300 + (s.age >= 18 ? (wealthQ(s) - 3) * 0.03 : 0) - (s.stress > 60 ? 0.1 : 0))) { s.partner = p; add(s, { happy: 10 }); if (!s.flags.firstRel) { s.flags.firstRel = 1; mark(s, 'Перші стосунки: ' + p.name); } return 'Ви з ' + p.name + ' почали зустрічатися.'; } add(s, { happy: -4 }); return p.name + ' відмовил' + gp(p, 'ов', 'а') + '.'; } },
     tries > 0 ? { t: 'Шукати далі', f: function () { return datePrompt(s, tries - 1); } } : { t: 'Не зараз', f: function () { return 'Може, наступного року.'; } }
   ] };
 }

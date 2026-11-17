@@ -34,6 +34,7 @@ function freeHours(s) {
   s.biz.forEach(function (b) { h -= b.mgr ? 4 : b.effort >= 1 ? 45 : 22; });
   if (s.gang) h -= 15;
   h -= chores(s);
+  if (s.chronic) h -= s.chronic.length * 2;   // лікарі, процедури, втома
   var small = s.kids.filter(function (k) { return k.alive && k.age < 12; }).length;
   h -= Math.min(24, small * 8) * (s.partner ? 0.6 : 1);
   if (s.job || s.study) h -= s.own && s.own.car ? 3 : s.urban ? 7 : 5;
