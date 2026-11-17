@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Жереб</title>
+<meta name="description" content="Симулятор життя: народжуєшся випадковою людиною з 8 мільярдів і проживаєш її долю.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- Старт -->
+  <section id="start" class="screen">
+    <div class="start-inner">
+      <p class="eyebrow">≈ 4 народження щосекунди · 86 країн · реальна статистика</p>
+      <h1 class="logo">ЖЕРЕБ</h1>
+      <p class="lead">Ти не обираєш, де народитися. Країну, родину і статок визначає випадок — так само, як колись у житті. Далі вирішуєш ти.</p>
+      <div class="start-btns">
+        <button id="btnBorn" class="btn primary" type="button">Народитися</button>
+        <button id="btnSandbox" class="btn ghost" type="button">Пісочниця: обрати самому</button>
+        <button id="btnGraves" class="btn link" type="button">Статистика життів</button>
+      </div>
+      <div id="curPick" class="curpick"></div>
+      <div id="slots" class="slots hidden"></div>
+      <canvas id="dots" aria-hidden="true"></canvas>
+    </div>
+  </section>
+
+  <!-- Гра -->
+  <section id="game" class="screen hidden">
+    <header class="top">
+      <div class="who">
+        <div class="flag" id="hFlag"></div>
+        <div>
+          <div class="name" id="hName"></div>
+          <div class="sub" id="hSub"></div>
+        </div>
+      </div>
+      <div class="money">
+        <div><span class="lbl" id="hMoneyL">Готівка</span><span id="hMoney" class="num"></span></div>
+        <div><span class="lbl">Статок</span><span id="hNet" class="num"></span></div>
+      </div>
+      <button class="btn small ghost" id="btnHub" type="button" title="Зберегти і вийти в хаб">Хаб</button>
+      <button class="btn small ghost" id="btnProfile" type="button">Профіль</button>
+      <button class="btn small ghost" id="btnMenu" type="button" aria-label="Меню">☰</button>
+    </header>
+
+    <div class="layout">
+      <aside id="profile" class="panel profile"></aside>
+
+      <main class="center">
+        <div class="bars" id="bars"></div>
+        <div id="log" class="log" aria-live="polite"></div>
+      </main>
+
+      <aside class="panel actions">
+        <div class="ap-row"><span class="lbl">Час цього року</span><span id="ap" class="ap"></span></div>
+        <nav class="tabs" id="tabs"></nav>
+        <div class="acts" id="acts"></div>
+        <div class="yr-btns"><button id="btnYear5" class="btn ghost" type="button" title="Зупиниться, якщо трапиться подія з вибором">+5 років</button><button id="btnYear" class="btn primary big" type="button">Прожити рік →</button></div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- Кінець -->
+  <section id="end" class="screen hidden"></section>
+</div>
+
+<!-- Модальне вікно -->
+<div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+  <div class="sheet">
+    <h2 id="mTitle"></h2>
+    <div id="mBody"></div>
+    <div id="mOpts" class="opts"></div>
+  </div>
+</div>
+<div id="toast" class="toast hidden"></div>
+
+<script src="js/data.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/actions.js"></script>
+<script src="js/events.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>
