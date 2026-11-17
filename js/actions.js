@@ -328,14 +328,62 @@ function confiscate(s) { var l = s.money * 0.8 + s.inv.cry * 0.8 + s.inv.stk * 0
 function busted(s, yrs, what) { var l = confiscate(s); var r = sentence(s, yrs, what); s.heat = 0; return r + (l > 1 ? ' Конфісковано ' + fmt(l) + '.' : ''); }
 A({ id: 'shadow', hidden: 1, tab: 'risk', n: 'Робота «в конверті»', d: 'Без податків; невеликий ризик штрафу', show: function (s) { return s.age >= 16; },
   run: function (s) { var e = M(s) * rnd(0.1, 0.2); if (chance(0.06 * (0.4 + C(s).law))) { var f = e * 2; s.money -= f; return 'Податкова помітила неоформлений заробіток — штраф ' + fmt(f) + '.'; } s.shadow = (s.shadow || 0) + e; s.lastShadow = s.age; return 'Цього року ти отримаєш ' + fmt(e) + ' без податків.'; } });
-A({ id: 'steal', hidden: 1, tab: 'risk', n: 'Дрібна крадіжка', d: 'Мало грошей, високий ризик', show: function (s) { return s.age >= 12; },
-  run: function (s) { if (crimeCaught(s, 0.3)) { if (s.age < 18) { s.flags.juvenile = 1; add(s, { happy: -8 }); s.parents.forEach(function (p) { p.rel -= 15; }); s.heat = 0; return 'Тебе спіймали. Поліція, ювенальний облік і дуже важка розмова з батьками.'; } if (chance(0.5)) { var f = M(s) * 0.1; s.money -= f; s.record++; s.recordAge = s.age; s.heat = 0; return 'Спіймали: штраф ' + fmt(f) + ' і судимість.'; } return busted(s, ri(1, 2), 'крадіжку'); }
-    var e = M(s) * rnd(0.01, 0.06); s.money += e; add(s, { happy: -2 }); return 'Вкрадено на ' + fmt(e) + '. На душі неспокійно.'; } });
-A({ id: 'scheme', hidden: 1, tab: 'risk', n: 'Афера', d: 'Гроші, якщо пощастить. Кожна наступна — ризикованіша', show: function (s) { return s.age >= 18; },
-  run: function (s) { if (crimeCaught(s, 0.3 - s.st.smarts / 600)) return busted(s, ri(2, 6), 'шахрайство');
-    var e = M(s) * rnd(0.15, 0.9) * (s.st.smarts / 70); s.money += e; return 'Афера вдалася: +' + fmt(e) + '. Але тепер за тобою можуть стежити.'; } });
-A({ id: 'smuggle', hidden: 1, tab: 'risk', n: 'Контрабанда через кордон', d: 'Ризиковано; залежить від того, як працює закон у країні', show: function (s) { return s.age >= 18 && C(s).law < 0.7; },
-  run: function (s) { if (crimeCaught(s, 0.28)) return busted(s, ri(2, 5), 'контрабанду'); var e = M(s) * rnd(0.2, 0.8); s.money += e; return 'Партія пройшла: +' + fmt(e) + '.'; } });
+// Невеликі сцени замість «вкрав — або спіймали, або ні»
+function riskP(s, base) { var p = (base + (s.heat || 0) * 0.06) * (0.4 + C(s).law) * (cartel(s) ? 0.4 : 1); s.heat = (s.heat || 0) + 1; return clamp(p, 0.01, 0.95); }
+// Суд: кілька шляхів, і жоден не гарантований
+function court(s, what, y1, y2) {
+  var yrs = ri(y1, y2), c = C(s), law = c.law, lawyer = M(s) * (0.3 + y2 * 0.15), bribe = M(s) * (0.5 + y2 * 0.3) * (cartel(s) ? 0.5 : 1);
+  if (s.age < 18) { s.flags.juvenile = 1; s.heat = 0; add(s, { happy: -8 }); s.parents.forEach(function (p) { p.rel -= 15; }); return 'Тебе затримали. Ювенальний облік, розмова з інспектором і дуже важка розмова з батьками.'; }
+  return { title: 'Суд', text: 'Справа: ' + what + '. Прокурор вимагає ' + yrs + ' р.', opts: [
+    { t: 'Визнати провину', sub: 'менший строк', f: function () { var y = Math.round(yrs * 0.5); if (y < 1) { s.record++; s.recordAge = s.age; s.money -= M(s) * 0.15; s.heat = 0; return 'Умовний строк і штраф ' + fmt(M(s) * 0.15) + '. Судимість залишиться.'; } return busted(s, y, what); } },
+    { t: 'Найняти адвоката', sub: fmt(lawyer) + ' · шанс виправдання ~' + Math.round(clamp(0.25 + (1 - law) * 0.25, 0.1, 0.6) * 100) + '%', dis: s.money < lawyer, f: function () { s.money -= lawyer; if (chance(clamp(0.25 + (1 - law) * 0.25, 0.1, 0.6))) { s.heat = 0; return 'Адвокат розвалив справу. Виправдано.'; } return busted(s, yrs, what); } },
+    { t: 'Дати хабар судді', sub: fmt(bribe) + (law > 0.7 ? ' · тут за це додадуть строк' : ' · тут це працює частіше'), dis: s.money < bribe, f: function () { s.money -= bribe; if (chance(clamp(1.05 - law * 1.2 + (cartel(s) ? 0.2 : 0), 0.03, 0.9))) { s.heat = 0; return 'Справу закрили «через брак доказів».'; } return busted(s, yrs + 2, what + ' і спробу підкупу'); } },
+    { t: 'Мовчати й чекати', sub: 'якщо доказів мало — можуть відпустити', f: function () { if (chance(0.15 + (1 - law) * 0.25)) { s.heat = Math.max(0, s.heat - 2); return 'Доказів забракло — тебе відпустили. Але поліція тебе запамʼятала.'; } return busted(s, yrs, what); } }] };
+}
+A({ id: 'steal', hidden: 1, tab: 'risk', n: 'Можливість щось поцупити', d: 'Мало грошей, високий ризик', show: function (s) { return s.age >= 12; },
+  run: function (s) {
+    var tg = pick([['гаманець у переповненому автобусі', 0.03], ['велосипед біля магазину', 0.04], ['телефон зі столика в кафе', 0.05], ['товар із супермаркету', 0.01], ['інструменти з відчиненого гаража', 0.04]]);
+    function loot() { var v = M(s) * tg[1] * rnd(0.5, 1.6); if (chance(0.15)) { v *= 0.3; s.money += v; return 'Річ виявилася дешевшою, ніж здавалося: лише ' + fmt(v) + '.'; } s.money += v; add(s, { happy: -2 }); return 'Вийшло: ' + tg[0] + ' — це ' + fmt(v) + '. Серце ще довго калатало.'; }
+    function noticed() {
+      return { title: 'Тебе помітили', text: 'Власник обернувся й дивиться просто на тебе.', opts: [
+        { t: 'Тікати', sub: 'спорт допоможе', f: function () { if (chance(0.3 + s.sk.sport / 150 + s.st.health / 400)) return 'Ти втік' + g(s, '', 'ла') + ' дворами. З порожніми руками, але на волі.'; return court(s, 'крадіжку', 0, 2); } },
+        { t: 'Віддати й вибачитися', f: function () { if (chance(0.55)) { add(s, { happy: -5, social: -2 }); return 'Людина сплюнула й пішла. Поліцію не кликали.'; } return court(s, 'спробу крадіжки', 0, 1); } },
+        { t: 'Відкупитися', sub: fmt(M(s) * 0.05), dis: s.money < M(s) * 0.05, f: function () { s.money -= M(s) * 0.05; return 'Гроші зробили своє — розійшлися мовчки.'; } }] };
+    }
+    return { title: 'Можливість', text: 'Ти помічаєш: ' + tg[0] + '. Ніхто не дивиться… здається.', opts: [
+      { t: 'Діяти швидко', f: function () { return chance(riskP(s, 0.3)) ? noticed() : loot(); } },
+      { t: 'Почекати слушного моменту', sub: 'безпечніше, але момент може минути', f: function () { if (chance(0.4)) return 'Момент минув — людина пішла.'; return chance(riskP(s, 0.15)) ? noticed() : loot(); } },
+      { t: 'Покликати друга на шухер', sub: 'ділитися навпіл', dis: s.friends < 1, f: function () { if (chance(riskP(s, 0.17))) return noticed(); var before = s.money, r = loot(); s.money -= (s.money - before) / 2; if (chance(0.15)) { s.heat += 2; return r + ' Друг потім розхвалився всім — по району пішли розмови.'; } return r + ' Половину віддав' + g(s, '', 'ла') + ' другові.'; } },
+      { t: 'Передумати', f: function () { return 'Ти пройш' + g(s, 'ов', 'ла') + ' повз.'; } }] };
+  } });
+A({ id: 'scheme', hidden: 1, tab: 'risk', n: 'Схема з «легкими грошима»', d: 'Шахрайство: спосіб обираєш ти', show: function (s) { return s.age >= 18; },
+  run: function (s) {
+    function outcome(kind, base, pay, after) {
+      if (chance(riskP(s, base))) return chance(0.35) ? (s.heat += 2, 'Жертви почали масово писати в поліцію — довелося все згорнути й залягти. Грошей — нуль.') : court(s, 'шахрайство', 2, 6);
+      var e = M(s) * pay; if (chance(0.15)) { e *= 0.4; s.money += e; return 'Напарник, який тримав рахунки, зник із більшою частиною. Тобі лишилося ' + fmt(e) + '.'; }
+      s.money += e; if (after) after(); return kind + ': +' + fmt(e) + '. Тепер головне — не світитися.';
+    }
+    return { title: 'Схема', text: 'Знайомий пропонує «тему». Варіантів кілька.', opts: [
+      { t: 'Дзвінки «зі служби безпеки банку»', sub: 'харизма допомагає', f: function () { return outcome('Дзвінки', 0.28 - s.st.social / 600, rnd(0.3, 1.2) * (s.st.social / 60)); } },
+      { t: 'Фейковий інтернет-магазин', sub: 'потрібне програмування', f: function () { return outcome('Інтернет-магазин', 0.24 - s.sk.code / 400, rnd(0.3, 1.5) * (0.5 + s.sk.code / 100)); } },
+      { t: '«Інвестиційний клуб» для знайомих', sub: 'багато грошей, але постраждають свої', f: function () { return outcome('«Клуб»', 0.35, rnd(1, 3.5) * (s.st.social / 60), function () { s.friends = Math.max(0, s.friends - 2); add(s, { happy: -4 }); }); } },
+      { t: 'Відмовитися', f: function () { return 'Ти відмови' + g(s, 'вся', 'лася') + '. Знайомий знайшов іншого.'; } }] };
+  } });
+A({ id: 'smuggle', hidden: 1, tab: 'risk', n: 'Контрабанда через кордон', d: 'Маршрут обираєш ти', show: function (s) { return s.age >= 18 && C(s).law < 0.7; },
+  run: function (s) {
+    var goods = pick(['сигарети', 'пальне', 'електроніку', 'алкоголь', 'ліки']), val = M(s) * rnd(0.3, 0.9);
+    function seized(p) { return 'Партію (' + goods + ') конфіскували' + (p ? ', а тебе затримали.' : '. Тебе відпустили, але гроші в товар пропали.'); }
+    return { title: 'Партія через кордон', text: 'Є партія: ' + goods + '. Як везти?', opts: [
+      { t: 'Через пункт пропуску з «домовленістю»', sub: 'хабар ' + fmt(M(s) * 0.05), dis: s.money < M(s) * 0.05, f: function () { s.money -= M(s) * 0.05;
+        if (chance(0.3)) return { title: 'На кордоні', text: 'Новий прикордонник «не в темі» і вимагає втричі більше.', opts: [
+          { t: 'Доплатити ' + fmt(M(s) * 0.15), dis: s.money < M(s) * 0.15, f: function () { s.money -= M(s) * 0.15; s.money += val; return 'Доплатив' + g(s, '', 'ла') + ' — партія пройшла: +' + fmt(val) + '.'; } },
+          { t: 'Розвернутися', f: function () { return 'Ти розвернув' + g(s, 'ся', 'лася') + '. Хабар пропав, товар лишився.'; } },
+          { t: 'Їхати на свій ризик', f: function () { if (chance(riskP(s, 0.4))) return chance(0.5) ? seized(false) : court(s, 'контрабанду', 1, 4); s.money += val; return 'Пронесло: +' + fmt(val) + '.'; } }] };
+        if (chance(riskP(s, 0.1))) return seized(false); s.money += val; return 'Усе за домовленістю: +' + fmt(val) + '.'; } },
+      { t: 'Лісом уночі', sub: 'без хабарів, але небезпечно', f: function () { if (chance(0.1)) { add(s, { health: -10 }); return 'Ти зірвав' + g(s, 'ся', 'лася') + ' в яр і пошкодив' + g(s, '', 'ла') + ' ногу. Партію кинув' + g(s, '', 'ла') + '.'; } if (chance(riskP(s, 0.25))) return chance(0.4) ? seized(false) : court(s, 'контрабанду', 1, 4); var v = val * (chance(0.2) ? 0.6 : 1); s.money += v; return 'Дійш' + g(s, 'ов', 'ла') + ': +' + fmt(v) + '.'; } },
+      { t: 'Через знайомого водія фури', sub: 'віддаси йому 40%', f: function () { if (chance(0.1)) return 'Водій зник разом із товаром.'; if (chance(riskP(s, 0.12))) return seized(false); s.money += val * 0.6; return 'Фура пройшла: +' + fmt(val * 0.6) + '.'; } },
+      { t: 'Відмовитися', f: function () { return 'Ти не ризикуєш.'; } }] };
+  } });
 
 // ---- Угруповання ----
 A({ id: 'join_gang', tab: 'risk', n: 'Вступити в угруповання', d: function (s) { return cartel(s) ? 'Картельна країна: поліція майже не заважає, але вбивають часто' : NARCO.indexOf(s.country) >= 0 ? 'Картель: великі гроші, висока смертність' : C(s).law < 0.5 ? 'Поліція тут слабка — ризик арешту нижчий' : 'Банда: поліція тут працює'; }, show: gangOK,
@@ -346,8 +394,16 @@ A({ id: 'join_gang', tab: 'risk', n: 'Вступити в угруповання
     mark(s, 'Вступ: ' + s.gang.kind); add(s, { happy: 2 }); s.parents.forEach(function (x) { x.rel -= 10; });
     return 'Ти тепер у ' + (s.gang.kind === 'картель' ? 'картелі' : s.gang.kind === 'банда' ? 'банді' : 'угрупованні') + '. Шляху назад може не бути.';
   } });
-A({ id: 'job_gang', tab: 'risk', n: 'Взяти серйозну справу', d: 'Більше грошей і шанс на підвищення, але більше уваги поліції', show: function (s) { return !!s.gang; },
-  run: function (s) { add(s, { happy: -2 }); return 'Справу взято. Наслідки — наприкінці року.'; } });
+A({ id: 'job_gang', tab: 'risk', n: 'Взяти справу від угруповання', d: 'Вибір: перевезення, борги чи охорона', show: function (s) { return !!s.gang; },
+  run: function (s) {
+    var g2 = s.gang;
+    function done(perf, pay, heat, harm, txt) { g2.perf = clamp(g2.perf + perf); g2.heat = (g2.heat || 0) + heat; s.shadow = (s.shadow || 0) + M(s) * pay; if (harm && chance(harm)) { add(s, { health: -20 }); return txt + ' Але тебе поранило.'; } return txt + ' (+' + fmt(M(s) * pay) + ')'; }
+    return { title: 'Справа', text: 'Бос дає вибір, що взяти цього року.', opts: [
+      { t: 'Перевезти партію', sub: 'менше насильства, більше уваги поліції', f: function () { if (chance(riskP(s, 0.12))) return court(s, 'перевезення заборонених речовин', 3, 8); return done(10, rnd(1, 3) * (NARCO.indexOf(s.country) >= 0 ? 2 : 1), 2, 0, 'Партія дійшла.'); } },
+      { t: 'Вибити борг', sub: 'спорт допомагає, можна постраждати', f: function () { var r = R(); if (r < 0.2 - s.sk.sport / 500) { add(s, { health: -15 }); g2.perf -= 5; return 'Боржник виявився не сам. Ти ледве вибрав' + g(s, 'ся', 'лася') + '.'; } if (r < 0.3) return court(s, 'вимагання', 2, 5); return done(12, rnd(0.5, 1.5), 1, 0.05, 'Борг повернуто.'); } },
+      { t: 'Охороняти точку', sub: 'нудно, мало грошей, мало ризику', f: function () { return done(4, rnd(0.3, 0.8), 0.5, 0.03, 'Спокійний рік на точці.'); } },
+      { t: 'Відмовитися цього разу', sub: 'бос запамʼятає', f: function () { g2.perf -= 12; return 'Бос нічого не сказав. Але подивився довго.'; } }] };
+  } });
 A({ id: 'bribe', tab: 'risk', n: 'Платити поліції', d: function (s) { return 'Ризик арешту ↓ на рік · ' + fmt(M(s) * (1 + s.gang.rank * 3)); }, show: function (s) { return !!s.gang && C(s).law < 0.8; },
   run: function (s) { var cost = M(s) * (1 + s.gang.rank * 3); s.money -= cost; if (chance(C(s).law * 0.3)) return busted2(s); return 'Потрібні люди отримали конверти.'; } });
 A({ id: 'lowkey', tab: 'risk', n: 'Залягти на дно', d: 'Менше доходу, менше ризику, розшук спадає', show: function (s) { return !!s.gang; },

@@ -887,9 +887,8 @@ function gangTick(s, out) {
   s.gangWar = false;
   if (chance(r.death)) { die(s, pick(['загинув' + g(s, '', 'ла') + ' у розборках', 'вбивство конкурентами', 'перестрілка з поліцією'])); return; }
   if (chance(r.arrest)) {
-    out.push({ title: 'Арешт', text: 'Тебе затримали. ' + (c.law < 0.5 ? 'Суд у цій країні можна «переконати».' : 'Справа серйозна.'), opts: [
-      { t: 'Відкупитися', sub: '~' + fmt(c.median * (3 + g2.rank * 8) * (cartel(s) ? 0.6 : 1)) + ' · шанс ' + Math.round(clamp(1 - c.law * 1.1 + (cartel(s) ? 0.2 : 0), 0.05, 0.92) * 100) + '%', dis: s.money < c.median * (3 + g2.rank * 8) * (cartel(s) ? 0.6 : 1), f: function () { s.money -= c.median * (3 + g2.rank * 8) * (cartel(s) ? 0.6 : 1); if (chance(clamp(1 - c.law * 1.1 + (cartel(s) ? 0.2 : 0), 0.05, 0.92))) { g2.heat = 0; return 'Справу «загубили». Ти на волі.'; } return busted2(s); } },
-      { t: 'Мовчати й чекати адвоката', f: function () { return busted2(s); } }] });
+    var cp = court(s, 'участь в організованому угрупованні', 2 + g2.rank, 4 + g2.rank * 3);
+    if (typeof cp === 'object') { cp.title = 'Арешт'; out.push(cp); } else say(s, cp, 'bad');
     return;
   }
   if (g2.rank < 4 && g2.perf > 60 + g2.rank * 8 && g2.yrs >= 2 && chance([0.22, 0.12, 0.05, 0.015][g2.rank] * (1 + (g2.perf - 60) / 50))) { g2.rank++; say(s, 'Тебе підвищили: тепер ти ' + GANG_RANK[g2.rank].toLowerCase() + ' (' + g2.kind + ').', 'big'); mark(s, GANG_RANK[g2.rank] + ' (' + g2.kind + ')'); }
@@ -918,6 +917,7 @@ function prisonTick(s, out) {
 }
 function hasRecord(s) { return s.record > 0 && (s.prison > 0 || s.age - s.recordAge < 10); }
 function sentence(s, yrs, what) {
+  if (s.gang) { s.gangPast = s.gang; s.gang = null; }
   s.record++; s.prison = yrs; if (s.job) endJob(s, 'вʼязниця');
   s.biz.slice().forEach(function (b) { if (!b.mgr) { b.mgr = true; b.effort = 0; } });
   if (s.partner && !s.partner.married && chance(0.5)) { say(s, s.partner.name + ' не стал' + gp(s.partner, '', 'а') + ' чекати.', 'bad'); s.partner = null; }
