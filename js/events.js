@@ -390,7 +390,7 @@ ev('gang_war', [15, 70], 5, function (s) { return !!s.gang && !s.prison; }, func
     O('Домовлятися', function () { if (chance(0.3 + s.st.social / 200)) { if (s.gang) s.gang.perf += 10; return 'Ти домовив' + g(s, 'ся', 'лася') + ' про перемирʼя. Бос оцінив.'; } s.gangWar = true; return 'Переговори зірвалися.'; }),
     O('Пересидіти', function () { if (s.gang) s.gang.perf -= 15; return 'Ти сховав' + g(s, 'ся', 'лася') + '. Свої це запамʼятали.'; })] };
 });
-ev('gang_betray', [16, 70], 2, function (s) { return s.gang && s.gang.rank >= 2; }, function (s) {
+ev('gang_betray', [16, 70], 2, function (s) { return s.gang && s.gang.rank >= 2 && s.gang.rank < 4; }, function (s) {
   return { text: 'Поліція пропонує угоду: свобода в обмін на свідчення проти боса.', opts: [
     O('Погодитися', function () { s.gangPast = s.gang; s.gang = null; if (chance(0.25)) { die(s, 'помста за зраду'); return 'Тебе знайшли.'; } s.heat = 0; mark(s, 'Свідок обвинувачення'); return 'Ти дав' + g(s, '', 'ла') + ' свідчення. Нове імʼя, нове місто.'; }, 'ризик помсти'),
     O('Відмовитися', function () { if (s.gang) s.gang.perf += 10; return 'Ти не зраджуєш своїх.'; })] };
@@ -647,4 +647,27 @@ ev('colleague', [22, 60], 2, function (s) { return s.job && JOB[s.job.id] && JOB
     O('Поступитися другові', function () { add(s, { social: 4 }); if (chance(0.4) && s.job) s.job.perf += 10; return 'Друг отримав посаду і не забув, хто йому допоміг.'; })] };
 });
 // Лишаємо тільки останні визначення подій з однаковими id
+(function () { var seen = {}; for (var i = EVENTS.length - 1; i >= 0; i--) { if (seen[EVENTS[i].id]) EVENTS.splice(i, 1); else seen[EVENTS[i].id] = 1; } })();
+
+// ---------- Мафія: падіння глави, союзи, зради ----------
+ev('boss_fall', [18, 75], 1.2, function (s) { return s.gang && s.gang.rank >= 2 && s.gang.rank < 4 && !s.gang.own; }, function (s) {
+  var g2 = s.gang, top = rankName(g2, 4).toLowerCase(), how = pick(['заарештували', 'застрелили біля ресторану', 'помер від інфаркту', 'втік за кордон']);
+  return { title: 'Без глави', text: 'Главу ' + (g2.kind === 'картель' ? 'картелю' : 'сімʼї') + ' ' + how + '. Почалася боротьба за місце.', opts: [
+    { t: 'Заявити свої права', sub: 'потрібні репутація й харизма; програш може коштувати життя', f: function () { if (chance(0.05 + g2.perf / 400 + s.st.social / 500 + (g2.rank === 3 ? 0.2 : 0))) { g2.rank = 4; mark(s, rankName(g2)); g2.heat += 2; return 'Інші визнали тебе. Тепер ти — ' + top + '.'; } if (chance(0.4)) { die(s, 'програш у боротьбі за владу'); return 'Ти програв' + g(s, '', 'ла') + '.'; } g2.rank = 1; g2.perf = 30; return 'Новий глава тебе понизив. Вижив' + g(s, '', 'ла') + ' — і то добре.'; } },
+    { t: 'Підтримати сильнішого кандидата', sub: 'безпечніше, можна отримати посаду', f: function () { g2.perf += 15; if (g2.rank < 3 && chance(0.4)) { g2.rank++; return 'Твій кандидат переміг і віддячив: тепер ти ' + rankName(g2).toLowerCase() + '.'; } return 'Твій кандидат переміг. Тебе запамʼятали як вірну людину.'; } },
+    { t: 'Прибрати головного конкурента', sub: 'кривавий шлях', f: function () { g2.heat += 3; if (chance(0.35 + s.sk.sport / 300)) { g2.rank = 4; mark(s, rankName(g2)); g2.warYrs = 1; return 'Конкурента не стало. Ти — ' + top + '.'; } if (chance(0.4)) { die(s, 'загинув' + g(s, '', 'ла') + ' у боротьбі за владу'); return 'Він виявився швидшим.'; } return court(s, 'замах на вбивство', 8, 15); } },
+    { t: 'Залягти й переждати', f: function () { g2.perf -= 5; return 'Ти пересидів' + g(s, '', 'ла') + ' бурю. Нового главу обрали без тебе.'; } }] };
+});
+ev('don_alliance', [20, 80], 3, function (s) { return s.gang && s.gang.rank === 4; }, function (s) {
+  return { text: 'Інша ' + (s.gang.kind === 'картель' ? 'організація' : 'сімʼя') + ' пропонує союз: спільні маршрути і поділ територій.', opts: [
+    { t: 'Погодитися', sub: 'більше грошей, але можуть зрадити', f: function () { if (chance(0.25)) { s.gangWar = true; return 'Союзники вдарили в спину. Цей рік — війна.'; } s.shadow = (s.shadow || 0) + M(s) * rnd(3, 10); return 'Союз приносить гроші.'; } },
+    { t: 'Погодитися, але підстрахуватися', sub: 'дорожче, зате безпечніше', f: function () { s.money -= M(s) * 2; s.shadow = (s.shadow || 0) + M(s) * rnd(2, 6); return 'Союз працює, твої люди пильнують союзників.'; } },
+    { t: 'Відмовити', sub: 'можуть образитися', f: function () { if (chance(0.3)) { s.gangWar = true; return 'Відмову сприйняли як образу. Війна.'; } return 'Розійшлися мирно.'; } }] };
+});
+ev('don_traitor', [20, 80], 2, function (s) { return s.gang && s.gang.rank === 4; }, function (s) {
+  return { text: 'Твій заступник надто часто зустрічається з чужими людьми. Схоже, готує переворот.', opts: [
+    { t: 'Вдарити першим', f: function () { if (!s.gang) return 'Вже неактуально.'; s.gang.heat += 2; if (chance(0.7)) return 'Загрозу усунуто. Інші зробили висновки.'; die(s, 'переворот у власній сімʼї'); return 'Заступник виявився швидшим.'; } },
+    { t: 'Поговорити відверто', sub: 'харизма', f: function () { if (!s.gang) return 'Вже неактуально.'; if (chance(0.3 + s.st.social / 250)) return 'Розмова все розставила по місцях. Заступник лишився вірним.'; if (chance(0.5)) { die(s, 'переворот у власній сімʼї'); return 'Розмова не допомогла.'; } s.gang.rank = 1; s.gang.own = false; return 'Тебе відсторонили. Живий — і то добре.'; } },
+    { t: 'Зробити вигляд, що не помітив', f: function () { if (!s.gang) return 'Вже неактуально.'; if (chance(0.4)) { die(s, 'переворот у власній сімʼї'); return 'Тебе застали зненацька.'; } return 'Чи то пронесло, чи то здалося.'; } }] };
+});
 (function () { var seen = {}; for (var i = EVENTS.length - 1; i >= 0; i--) { if (seen[EVENTS[i].id]) EVENTS.splice(i, 1); else seen[EVENTS[i].id] = 1; } })();

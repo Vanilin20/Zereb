@@ -234,7 +234,7 @@
     if (S.job && !S.job.teen) { h += kv('Посада', jobTitle(S)) + kv('Зарплата до податків', fmt(jobPay(S)) + '/рік') + kv('Податок на зарплату', '~' + Math.round(taxRate(S, jobPay(S)) * 100) + '%' + (C(S).flat ? ' (плоска шкала)' : '')) + kv('Продуктивність', Math.round(S.job.perf)) + kv('Стаж тут', yrs(S.job.yrs)); }
     else h += kv('Статус', jobTitle(S));
     if (hasRecord(S)) h += kv('Судимість', 'так, знижує шанси на роботу');
-    if (S.gang) { var gr = gangRisk(S); h += kv('Угруповання', GANG_RANK[S.gang.rank] + ' · ' + S.gang.kind) + kv('Ризик загинути / арешту', pct(gr.death) + ' / ' + pct(gr.arrest) + ' на рік'); }
+    if (S.gang) { var gr = gangRisk(S); h += kv(S.gang.kind === 'картель' ? 'Картель' : 'Сімʼя', rankName(S.gang) + (S.gang.own ? ' · людей: ' + (S.gang.size || 1) : '') + (S.gang.warYrs ? ' · війна ще ' + S.gang.warYrs + ' р.' : '')) + kv('Ризик загинути / арешту', pct(gr.death) + ' / ' + pct(gr.arrest) + ' на рік'); }
     if (S.fame > 3) h += kv('Слава', Math.round(S.fame));
     h += '<h3>Гроші</h3>' + kv('Готівка', fmt(S.money)) + (S.debt ? kv('Борг', fmt(S.debt)) : '') +
       (S.inv.dep + S.inv.stk + S.inv.cry > 1 ? kv('Депозит / акції / крипта', fmt(S.inv.dep) + ' / ' + fmt(S.inv.stk) + ' / ' + fmt(S.inv.cry)) : '') +

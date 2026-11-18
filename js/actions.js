@@ -392,7 +392,7 @@ A({ id: 'join_gang', tab: 'risk', n: 'Вступити в угруповання
     if (!chance(p)) return 'Тебе не взяли — «не наш».';
     s.gang = { rank: 0, yrs: 0, perf: 50, heat: 0, kind: gangKind(s) };
     mark(s, 'Вступ: ' + s.gang.kind); add(s, { happy: 2 }); s.parents.forEach(function (x) { x.rel -= 10; });
-    return 'Ти тепер у ' + (s.gang.kind === 'картель' ? 'картелі' : s.gang.kind === 'банда' ? 'банді' : 'угрупованні') + '. Шляху назад може не бути.';
+    return 'Ти тепер ' + rankName(s.gang).toLowerCase() + ' в ' + (s.gang.kind === 'картель' ? 'картелі' : 'мафіозній сімʼї') + '. Шляху назад може не бути.';
   } });
 A({ id: 'job_gang', tab: 'risk', n: 'Взяти справу від угруповання', d: 'Вибір: перевезення, борги чи охорона', show: function (s) { return !!s.gang; },
   run: function (s) {
@@ -453,4 +453,24 @@ A({ id: 'shady', tab: 'risk', n: 'Тіньові пропозиції', d: 'Що
     var opts = off.v.filter(function (id) { return off.used.indexOf(id) < 0; }).map(function (id) { var a = ACTIONS.filter(function (x) { return x.id === id; })[0]; return { t: a.n, sub: typeof a.d === 'function' ? a.d(s) : a.d, f: function () { off.used.push(id); return a.run(s); } }; });
     opts.push({ t: 'Відмовитися від усього', f: function () { off.used = off.v.slice(); return 'Ти не вʼязуєшся в сумнівне.'; } });
     return { title: 'Тіньові пропозиції', text: cartel(s) ? 'Тут таких пропозицій вистачає, а поліції — ні.' : 'Знайомі знайомих пропонують «підзаробити».', opts: opts };
+  } });
+
+// ---- Шлях нагору: переворот і своя сімʼя ----
+A({ id: 'coup', tab: 'risk', n: 'Кинути виклик главі', d: 'Тільки для заступника: або все, або нічого', show: function (s) { return s.gang && s.gang.rank === 3 && !s.gang.own; },
+  run: function (s) {
+    var g2 = s.gang, top = rankName(g2, 4).toLowerCase();
+    function win(txt) { g2.rank = 4; g2.heat += 3; mark(s, rankName(g2)); add(s, { happy: 5 }); return txt + ' Тепер ти — ' + top + '.'; }
+    return { title: 'Переворот', text: 'Ти — друга людина в ' + (g2.kind === 'картель' ? 'картелі' : 'сімʼї') + '. Глава старіє і робить помилки. Як діяти?', opts: [
+      { t: 'Таємна змова з іншими', sub: 'харизма й репутація; якщо злиють — кінець', f: function () { if (chance(0.2 + s.st.social / 300 + g2.perf / 400)) return win('Більшість стала на твій бік, і старого «відправили на пенсію».'); if (chance(0.5)) { die(s, 'змову викрили'); return 'Хтось злив змову.'; } g2.rank = 1; g2.perf = 30; return 'Змову викрили. Тебе понизили — живий лише завдяки старим заслугам.'; } },
+      { t: 'Засідка', sub: 'найшвидше, найкривавіше', f: function () { if (chance(0.4 + s.sk.sport / 400)) { g2.warYrs = 2; return win('Засідка вдалася. Частина людей глави ще мститиме.'); } if (chance(0.6)) { die(s, 'загинув' + g(s, '', 'ла') + ' під час перевороту'); return 'Засідка провалилася.'; } return court(s, 'замах на вбивство', 8, 15); } },
+      { t: 'Здати главу поліції', sub: 'залежить від того, як тут працює закон', f: function () { if (chance(C(s).law * 0.8)) { if (chance(0.7)) return win('Главу заарештували, і місце звільнилося.'); die(s, 'помста за донос'); return 'Хтось дізнався, хто дав свідчення.'; } g2.heat += 2; return 'Поліція «загубила» твої свідчення. Залишається сподіватися, що глава не дізнається.'; } },
+      { t: 'Передумати', f: function () { return 'Ти чекаєш свого часу.'; } }] };
+  } });
+A({ id: 'split', tab: 'risk', n: 'Створити власне угруповання', d: 'Одразу стаєш главою, але колишні «свої» оголосять війну', show: function (s) { return s.gang && s.gang.rank >= 1 && !s.gang.own; },
+  run: function (s) {
+    var g2 = s.gang;
+    return { title: 'Своя справа', text: 'Ти можеш піти й забрати з собою кількох людей. Але колишні «свої» такого не прощають.', opts: [
+      { t: 'Піти з людьми', sub: 'війна на 3 роки', f: function () { g2.own = true; g2.rank = 4; g2.size = 1 + Math.floor(s.st.social / 35); g2.warYrs = 3; g2.perf = 50; mark(s, rankName(g2)); return 'Ти — ' + rankName(g2).toLowerCase() + '. Людей: ' + g2.size + '. Тепер головне — пережити найближчі роки.'; } },
+      { t: 'Домовитися про мирний відхід', sub: 'доведеться віддати частину грошей', f: function () { var pay = s.money * 0.4 + M(s) * g2.rank; s.money -= pay; if (chance(0.35 + s.st.social / 300)) { g2.own = true; g2.rank = 4; g2.size = 1; mark(s, rankName(g2)); return 'Заплатив' + g(s, '', 'ла') + ' ' + fmt(pay) + ' — тебе відпустили з благословенням. Ти — ' + rankName(g2).toLowerCase() + '.'; } g2.warYrs = 3; g2.own = true; g2.rank = 4; g2.size = 1; return 'Гроші взяли, але війну все одно оголосили.'; } },
+      { t: 'Залишитися', f: function () { return 'Поки що ти лишаєшся.'; } }] };
   } });

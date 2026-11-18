@@ -259,7 +259,7 @@ function endJob(s, why) {
 function lvName(j, l) { var a = j.lv || LV; return a[Math.min(l, a.length - 1)] || LV[Math.min(l, 4)]; }
 function jobTitle(s) {
   if (s.prison) return 'У вʼязниці (ще ' + s.prison + ' р.)';
-  if (s.gang && !s.job) return GANG_RANK[s.gang.rank] + ' (' + s.gang.kind + ')';
+  if (s.gang && !s.job) return rankName(s.gang) + ' (' + s.gang.kind + ')';
   if (!s.job) return s.retired ? 'Пенсіонер' : (s.study ? studyName(s.study) : (s.age < 6 ? 'Дитина' : 'Без роботи'));
   if (s.job.teen) return s.job.n + ' (підробіток)';
   var j = JOB[s.job.id];
@@ -864,14 +864,16 @@ function ownTick(s) {
 var NARCO = ['MX', 'CO', 'PE', 'BR', 'AF', 'MM', 'HT', 'NG'];
 var CARTEL = ['MX', 'CO'];   // найбільші картельні країни: нелегальне тут живе вільніше
 function cartel(s) { return CARTEL.indexOf(s.country) >= 0; }
-var GANG_RANK = ['Шістка', 'Боєць', 'Бригадир', 'Лейтенант', 'Бос'];
+var MAFIA_RANKS = ['Прибічник', 'Солдат', 'Капо', 'Заступник дона', 'Дон'];
+var CARTEL_RANKS = ['Халькон (дозорний)', 'Сікаріо', 'Хефе де пласа', 'Лейтенант картелю', 'Глава картелю'];
+function rankName(g2, r) { if (r == null) r = g2.rank; if (g2.own && r === 4) return g2.kind === 'картель' ? 'Глава власного картелю' : 'Дон власної сімʼї'; return (g2.kind === 'картель' ? CARTEL_RANKS : MAFIA_RANKS)[r]; }
 var GANG_PAY = [0.8, 2, 5, 15, 60];
-function gangKind(s) { return NARCO.indexOf(s.country) >= 0 ? 'картель' : C(s).law < 0.5 ? 'угруповання' : 'банда'; }
+function gangKind(s) { return NARCO.indexOf(s.country) >= 0 ? 'картель' : 'мафіозна сімʼя'; }
 function gangOK(s) { return s.age >= 15 && s.age <= 45 && s.urban && !s.gang && !s.prison && C(s).law < 0.75; }
 function gangRisk(s) {
   var g2 = s.gang, c = C(s), narco = NARCO.indexOf(s.country) >= 0;
   return {
-    death: [0.012, 0.02, 0.03, 0.04, 0.05][g2.rank] * (narco ? (cartel(s) ? 1.5 : 1.8) : 1) * (s.gangWar ? 2.5 : 1) * (s.used.lowkey ? 0.6 : 1),
+    death: [0.012, 0.02, 0.03, 0.04, 0.05][g2.rank] * (narco ? (cartel(s) ? 1.5 : 1.8) : 1) * (s.gangWar ? 2.5 : 1) * (g2.warYrs > 0 ? 2 : 1) * (s.used.lowkey ? 0.6 : 1),
     arrest: clamp((0.03 + g2.rank * 0.015 + (g2.heat || 0) * 0.03) * (0.15 + c.law * 1.2) * (s.used.bribe ? 0.35 : 1) * (s.used.lowkey ? 0.6 : 1) * (cartel(s) ? 0.4 : 1), 0.004, 0.8)
   };
 }
@@ -879,7 +881,7 @@ function gangTick(s, out) {
   var g2 = s.gang; if (!g2 || s.prison) return;
   var c = C(s), narco = NARCO.indexOf(s.country) >= 0, r = gangRisk(s);
   g2.yrs++;
-  var inc = c.median * GANG_PAY[g2.rank] * (narco ? 3 : 1) * (cartel(s) ? 1.3 : 1) * rnd(0.5, 1.5) * (s.used.job_gang ? 1.5 : 1) * (s.used.lowkey ? 0.5 : 1);
+  var inc = c.median * (g2.own ? GANG_PAY[4] * 0.12 * (g2.size || 1) : GANG_PAY[g2.rank]) * (narco ? 3 : 1) * (cartel(s) ? 1.3 : 1) * rnd(0.5, 1.5) * (s.used.job_gang ? 1.5 : 1) * (s.used.lowkey ? 0.5 : 1);
   if (g2.rank === 4 && narco && chance(0.06)) { inc *= 10; say(s, 'Канал поставок розширився на інші країни — гроші течуть рікою.', 'big'); }
   s.shadow = (s.shadow || 0) + inc;
   g2.perf = clamp(g2.perf * 0.5 + 25 + (s.st.smarts - 50) * 0.2 + s.sk.sport / 8 + (s.st.social - 50) * 0.2 + (s.used.job_gang ? 15 : 0) + rnd(-10, 10));
@@ -891,7 +893,17 @@ function gangTick(s, out) {
     if (typeof cp === 'object') { cp.title = 'Арешт'; out.push(cp); } else say(s, cp, 'bad');
     return;
   }
-  if (g2.rank < 4 && g2.perf > 60 + g2.rank * 8 && g2.yrs >= 2 && chance([0.22, 0.12, 0.05, 0.015][g2.rank] * (1 + (g2.perf - 60) / 50))) { g2.rank++; say(s, 'Тебе підвищили: тепер ти ' + GANG_RANK[g2.rank].toLowerCase() + ' (' + g2.kind + ').', 'big'); mark(s, GANG_RANK[g2.rank] + ' (' + g2.kind + ')'); }
+  if (g2.warYrs > 0) { g2.warYrs--; if (!g2.warYrs) say(s, 'Війна з колишніми «своїми» вщухла.', 'good'); }
+  if (g2.own) { if (g2.perf > 60 && (g2.size || 1) < 6 && chance(0.25)) { g2.size = (g2.size || 1) + 1; say(s, 'Твоя ' + (g2.kind === 'картель' ? 'організація' : 'сімʼя') + ' росте: до тебе перейшли нові люди.', 'good'); } return; }
+  if (g2.rank === 0 && g2.perf > 58 && g2.yrs >= 2 && !g2.askedInit) { g2.askedInit = 1; out.push(initiation(s)); return; }
+  if (g2.rank >= 1 && g2.rank < 3 && g2.perf > 62 + g2.rank * 8 && g2.yrs >= 3 && chance([0, 0.12, 0.05][g2.rank] * (1 + (g2.perf - 60) / 50))) { g2.rank++; say(s, 'Тебе підвищили: тепер ти ' + rankName(g2).toLowerCase() + ' (' + g2.kind + ').', 'big'); mark(s, rankName(g2)); }
+}
+function initiation(s) {
+  var g2 = s.gang, cart = g2.kind === 'картель';
+  return { title: cart ? 'Перевірка' : 'Посвячення', text: cart ? 'Щоб стати сікаріо, треба довести, що на тебе можна покластися. Тобі дають завдання.' : 'Сімʼя готова зробити тебе «своїм» — солдатом. Але спершу — доручення, після якого назад дороги не буде.', opts: [
+    { t: 'Виконати, що скажуть', sub: 'найпевніший шлях, але ризик і для тебе', f: function () { g2.heat += 2; if (chance(0.1)) { add(s, { health: -20 }); return 'Щось пішло не так — тебе поранило. Посвячення відклали.'; } if (chance(riskP(s, 0.08))) return court(s, 'тяжкий злочин', 4, 10); g2.rank = 1; g2.perf += 10; mark(s, rankName(g2)); return 'Ти пройш' + g(s, 'ов', 'ла') + ' перевірку. Тепер ти ' + rankName(g2).toLowerCase() + '.'; } },
+    { t: 'Попросити інше доручення', sub: 'харизма вирішить, чи погодяться', f: function () { if (chance(0.25 + s.st.social / 250)) { g2.rank = 1; mark(s, rankName(g2)); return 'Тобі доручили «бухгалтерію». Посвячення пройдено без крові.'; } g2.perf -= 10; g2.askedInit = 0; return 'На тебе подивилися з підозрою. Посвячення відклали.'; } },
+    { t: 'Відмовитися', sub: 'лишишся на побігеньках', f: function () { g2.perf -= 20; return 'Ти лишаєшся «прибічником». Довіри до тебе поменшало.'; } }] };
 }
 function busted2(s) {
   var g2 = s.gang, yrs = ri(2, 4) + g2.rank * ri(1, 3);
@@ -958,7 +970,7 @@ var ACHIEVEMENTS = [
   { id: 'hobby', n: 'Хобі стало справою', d: 'Професія, відкрита через хобі', t: function (s) { return !!s.flags.hobbyJob; } },
   { id: 'top', n: 'На вершині', d: 'Найвища посада в професії', t: function (s) { return s.jobHist.concat(s.job ? [s.job] : []).some(function (j) { var J = JOB[j.id]; return J && J.max && j.lvl === J.max; }); } },
   { id: 'poor2rich', n: 'З низів', d: 'З дуже бідної родини до верхніх 10% світу', t: function (s) { return s.d <= 2 && globalPct(s.stat.peakInc) >= 0.9; } },
-  { id: 'boss', n: 'Хрещений батько', d: 'Стати босом угруповання', t: function (s) { return (s.gang && s.gang.rank === 4) || (s.gangPast && s.gangPast.rank === 4); } },
+  { id: 'boss', n: 'Дон', d: 'Очолити мафіозну сімʼю або картель', t: function (s) { return (s.gang && s.gang.rank === 4) || (s.gangPast && s.gangPast.rank === 4); } },
   { id: 'billion', n: 'Мільярдер', d: 'Статок $1 млрд', t: function (s) { return s.stat.peakNet >= 1e9; } },
   { id: 'teacher', n: 'Учитель', d: 'Пропрацювати вчителем 20 років', t: function (s) { return yearsIn(s, 'teacher') >= 20; } }
 ];
