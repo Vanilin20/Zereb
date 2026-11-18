@@ -19,7 +19,7 @@
     catch (e) { while (ids.length > 1) { delete all[ids.pop()]; try { localStorage.setItem(SKEY, JSON.stringify(all)); return; } catch (e2) { } } }
   }
   function unsave(id) { var all = saves(); delete all[id]; store(SKEY, all); }
-  function load(id) { var s = saves()[id]; if (!s) return; S = s; if (!S.d) S.d = S.q * 2 - 1; S.cur = S.log[S.log.length - 1]; if (!S.sched) S.sched = {}; if (!S.own) S.own = { car: null, carVal: 0, gear: 0, homeLvl: 0, pet: null, petAge: 0 }; if (!S.h) S.h = {}; delete S.peers; Q = []; tab = 'sched'; setSpeed(0); show('game'); render(); }
+  function load(id) { var s = saves()[id]; if (!s) return; S = s; if (!S.d) S.d = S.q * 2 - 1; S.cur = S.log[S.log.length - 1]; if (!S.citizen) S.citizen = [S.birth]; if (!S.status) S.status = S.immigrant ? 'pr' : 'citizen'; if (!S.sched) S.sched = {}; if (!S.own) S.own = { car: null, carVal: 0, gear: 0, homeLvl: 0, pet: null, petAge: 0 }; if (!S.h) S.h = {}; delete S.peers; Q = []; tab = 'sched'; setSpeed(0); show('game'); render(); }
   function toHub() { setSpeed(0); save(); closeModal(); $('profile').classList.remove('open'); startScreen(); }
   function show(id) { ['start', 'game', 'end'].forEach(function (x) { $(x).classList.toggle('hidden', x !== id); }); $('toast').classList.add('hidden'); }
   function yrs(n) { var a = n % 10, b = n % 100; return n + ' ' + (a === 1 && b !== 11 ? 'рік' : a >= 2 && a <= 4 && (b < 12 || b > 14) ? 'роки' : 'років'); }
@@ -318,7 +318,7 @@
     if (S.kids.length) h += '<div class="ppl">Діти:</div>' + S.kids.map(function (k) { return '<div class="ppl"><span class="' + (k.alive ? '' : 'dead') + '">' + esc(k.name) + ', ' + k.age + '</span> · стосунки ' + Math.round(k.rel) + '<br><small class="note">' + [k.job ? esc(k.job) : '', k.uni ? 'університет' : '', k.talent && k.talent.indexOf('_lost') < 0 ? 'талант' : '', k.rebel ? 'бунтар' : '', k.abroad ? 'живе: ' + COUNTRIES[k.abroad].name : '', k.married ? 'одружен' + gp(k, 'ий', 'а') : ''].filter(Boolean).join(' · ') + '</small></div>'; }).join('');
     if (S.grandkids) h += '<div class="ppl">Онуків: ' + S.grandkids + '</div>';
     h += '<div class="ppl">Друзів: ' + S.friends + '</div>';
-    h += '<h3>Країна</h3>' + kv('Де живеш', c.flag + ' ' + c.name) + rulesHTML(c) + kv('Тривалість життя', c.le + ' р.') + kv('Економіка', S.econ < 0 ? 'криза' : S.econ > 0 ? 'підйом' : 'стабільна') + (cf(S) ? kv('Безпека', cf(S) === 2 ? 'війна' : 'напружено') : '') + (S.immigrant ? kv('Адаптація', yrs(S.immYrs)) : '');
+    h += '<h3>Країна</h3>' + kv('Де живеш', c.flag + ' ' + c.name) + kv('Громадянство', (S.citizen || [S.birth]).map(function (x) { return COUNTRIES[x].flag + ' ' + COUNTRIES[x].name; }).join(', ')) + (isCitizen(S) ? '' : kv('Статус тут', STATUS_N[resStatus(S)]) + kv('До громадянства', (function () { var r = natRule(S.country); return r.cit >= 99 ? 'практично неможливо' : (resStatus(S) === 'pr' ? 'ще ' + Math.max(0, r.cit - S.immYrs) + ' р. + мова ' + r.lang : 'спершу постійне проживання (через ' + Math.max(0, r.pr - S.immYrs) + ' р.)'); })())) + rulesHTML(c) + kv('Тривалість життя', c.le + ' р.') + kv('Економіка', S.econ < 0 ? 'криза' : S.econ > 0 ? 'підйом' : 'стабільна') + (cf(S) ? kv('Безпека', cf(S) === 2 ? 'війна' : 'напружено') : '') + (S.immigrant ? kv('Адаптація', yrs(S.immYrs)) : '');
     $('profile').innerHTML = cur(h);
   }
 
@@ -367,6 +367,7 @@
       '<div class="kv"><span>Карʼєра</span><span>' + (careers.length ? careers.map(function (j) { var J = JOB[j.id]; return J.n + (J.max ? ' (' + lvName(J, j.lvl).toLowerCase() + ')' : ''); }).join(' → ') : 'не працював' + g(S, '', 'ла') + ' офіційно') + '</span></div>' +
       '<div class="kv"><span>Бізнеси</span><span>' + (S.bizHist.length + S.biz.length ? S.bizHist.map(function (b) { return b.name + ' (' + yrs(b.yrs) + ', ' + b.how + ')'; }).concat(S.biz.map(function (b) { return b.name + ' (' + yrs(b.yrs) + ', до кінця)'; })).join('; ') : '—') + '</span></div>' +
       '<div class="kv"><span>Країни</span><span>' + S.countries.map(function (x) { return COUNTRIES[x].flag + ' ' + COUNTRIES[x].name; }).join(' → ') + '</span></div>' +
+      '<div class="kv"><span>Громадянство</span><span>' + (S.citizen || [S.birth]).map(function (x) { return COUNTRIES[x].flag + ' ' + COUNTRIES[x].name; }).join(', ') + '</span></div>' +
       '<div class="kv"><span>Діти / онуки</span><span>' + S.kids.length + ' / ' + S.grandkids + '</span></div>' +
       '<div class="kv"><span>Шлюбів</span><span>' + S.marriages + '</span></div>';
     h += '<h2>Життя в графіках</h2>' + chartsHTML('e');

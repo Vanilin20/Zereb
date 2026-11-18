@@ -12,10 +12,11 @@ function electionCycle(s) { return s.country === 'US' ? 4 : 5; }
 // Куди можна балотуватися з поточної посади
 function polTargets(s) {
   var o = s.pol.office, t = [];
+  if (!isCitizen(s)) return [];   // балотуватися можуть лише громадяни
   if (o === 0) t.push(1);
   if (o === 1) t.push(2, 3);
   if (o === 2) t.push(3);
-  if ((o === 2 || o === 3 || o === 4) && s.fame >= 30 && s.age >= 35) t.push(5);
+  if ((o === 2 || o === 3 || o === 4) && s.fame >= 30 && s.age >= 35 && s.birth === s.country) t.push(5);   // глава держави — лише народжені в країні
   return t;
 }
 var OFFICE_BAR = [0, 52, 58, 60, 0, 68];   // скільки «очок» треба, щоб перемогти
@@ -75,8 +76,9 @@ function campaign(s, target) {
   return { title: 'Вибори: ' + offs[target].toLowerCase(), text: 'Ти йдеш як ' + partyName(P.party) + '. ' + (autocracy(s) ? (P.party === 'opp' ? 'Тут вибори контролює влада — опозиції майже нічого не світить.' : 'Тут вибори — формальність для правлячої партії.') : 'Як будуєш кампанію?'), opts: opts };
 }
 
-A({ id: 'politics', tab: 'work', n: 'Піти в політику', d: 'Партія, вибори, посади', show: function (s) { return s.age >= 21 && !s.pol && !s.prison; },
+A({ id: 'politics', tab: 'work', n: 'Піти в політику', d: function (s) { return isCitizen(s) ? 'Партія, вибори, посади' + (s.birth !== s.country ? ' · главою держави може стати лише народжений тут' : '') : 'Потрібне громадянство цієї країни'; }, show: function (s) { return s.age >= 21 && !s.pol && !s.prison; },
   run: function (s) {
+    if (!isCitizen(s)) return 'У ' + C(s).name + ' в політику можуть іти лише громадяни.';
     function join(p) { return function () { s.pol = { office: 0, party: p, approval: 50, terms: 0, nextElec: s.age + 1 }; mark(s, 'Політика: ' + partyName(p)); return 'Ти тепер ' + partyName(p) + '. Перші вибори — вже наступного року.'; }; }
     return { title: 'Політика', text: autocracy(s) ? 'У цій країні реальна влада — в однієї партії. Опозиціонерам тут небезпечно.' : 'З чого почати?', opts: [
       { t: 'Вступити в правлячу партію', sub: s.econ < 0 ? 'зараз криза — партію не люблять' : 'легше перемагати, поки економіка росте', f: join('rul') },

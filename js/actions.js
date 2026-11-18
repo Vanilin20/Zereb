@@ -271,6 +271,8 @@ A({ id: 'tovillage', tab: 'move', n: 'Переїхати в село', d: 'Сп�
   run: function (s) { s.urban = false; if (s.job && JOB[s.job.id].urban) endJob(s, 'переїзд'); add(s, { happy: 3 }); return 'Ти перебрав' + g(s, 'ся', 'лася') + ' за місто.'; } });
 function emigrate(s, code, how) {
   var from = C(s);
+  s.status = statusAfterMove(s, code, how); s.prAsked = 0; s.natAsked = 0;
+  if (s.pol) { s.polPast = s.pol; s.pol = null; }
   s.country = code; s.immigrant = code !== s.birth; s.immYrs = 0;
   if (s.countries.indexOf(code) < 0) s.countries.push(code);
   if (s.job) endJob(s, 'еміграція');
@@ -281,12 +283,12 @@ function emigrate(s, code, how) {
   if (s.partner && !s.partner.married) { s.partner = null; s.exes++; }
   add(s, { happy: -6 });
   mark(s, 'Переїзд: ' + from.name + ' → ' + COUNTRIES[code].name);
-  return 'Ти ' + g(s, 'переїхав', 'переїхала') + ' до ' + COUNTRIES[code].name + ' ' + COUNTRIES[code].flag + ' (' + how + '). Нова мова, нові правила, нове життя.';
+  return 'Ти ' + g(s, 'переїхав', 'переїхала') + ' до ' + COUNTRIES[code].name + ' ' + COUNTRIES[code].flag + ' (' + how + '). Статус: ' + STATUS_N[resStatus(s)] + '.' + (resStatus(s) === 'illegal' ? ' Офіційно працювати не можна.' : ' Нова мова, нові правила, нове життя.');
 }
 A({ id: 'emigrate', tab: 'move', n: 'Емігрувати', d: 'Робоча віза, навчання, біженство, лотерея', show: function (s) { return s.age >= 17; },
   run: function (s) {
     var o = [];
-    EMIGRATE_TO.filter(function (c) { return c !== s.country; }).forEach(function (code) {
+    EMIGRATE_TO.filter(function (c) { return c !== s.country && (s.banned || []).indexOf(c) < 0; }).forEach(function (code) {
       var d = COUNTRIES[code], open = OPENNESS[code] || 0.3, cost = d.median * 0.08;
       var lang = workLang(s, code);
       var work = s.edu >= 4 && s.age <= 50 ? (hasRecord(s) ? 0.3 : 1) * clamp(open * 0.55 * (0.15 + lang) * (s.edu >= 5 ? 1.2 : 0.7) * (1 + Math.min(10, yearsWorked(s)) / 12) * (s.job && JOB[s.job.id] && JOB[s.job.id].g ? 1.4 : 1), 0.02, 0.8) : 0;
@@ -300,14 +302,15 @@ A({ id: 'emigrate', tab: 'move', n: 'Емігрувати', d: 'Робоча в�
       if (code === 'US' && !s.used.dv) o.push({ t: '🇺🇸 Лотерея грін-карт', sub: 'шанс ~1%, безкоштовно', f: function () { s.used.dv = 1; if (chance(0.012) && s.edu >= 3) return emigrate(s, 'US', 'виграш у лотерею грін-карт'); return 'У лотерею цього року не пощастило.'; } });
     });
     var curGdp = C(s).gdp;
-    COUNTRY_LIST.filter(function (d) { return d.code !== s.country && EMIGRATE_TO.indexOf(d.code) < 0 && (d.gdp <= curGdp * 1.3 || d.law < 0.5); }).sort(function (a, b) { return a.name.localeCompare(b.name, 'uk'); }).forEach(function (d) {
+    COUNTRY_LIST.filter(function (d) { return d.code !== s.country && (s.banned || []).indexOf(d.code) < 0 && EMIGRATE_TO.indexOf(d.code) < 0 && (d.gdp <= curGdp * 1.3 || d.law < 0.5); }).sort(function (a, b) { return a.name.localeCompare(b.name, 'uk'); }).forEach(function (d) {
       var cost = Math.max(M(s), d.median) * 0.05;
       o.push({ t: d.flag + ' ' + d.name + ' — просто переїхати', sub: 'шанс ~85% · ' + fmt(cost) + ' · закон: ' + (d.law > 0.75 ? 'суворий' : d.law > 0.5 ? 'працює' : 'слабкий') + (NARCO.indexOf(d.code) >= 0 ? ' · тут діють картелі' : '') + (d.conflict === 2 ? ' · війна' : ''), dis: s.money < cost,
         f: function () { s.money -= cost; if (chance(0.85)) return emigrate(s, d.code, 'переїзд'); return 'На кордоні щось пішло не так — довелося повернутися.'; } });
     });
     var off = yearly(s, 'emig', function () { return wsample(o, 4, function (x) { return /біженець/.test(x.t) ? 5 : /просто переїхати/.test(x.t) ? 0.5 : /Лотерея/.test(x.t) ? 0.7 : 1; }).map(function (x) { return x.t; }); });
     o = o.filter(function (x) { return off.v.indexOf(x.t) >= 0; });
-    if (s.immigrant) o.unshift({ t: COUNTRIES[s.birth].flag + ' Повернутися додому', sub: COUNTRIES[s.birth].name, f: function () { return emigrate(s, s.birth, 'повернення'); } });
+    (s.citizen || []).filter(function (x) { return x !== s.country && x !== s.birth; }).forEach(function (x) { o.unshift({ t: COUNTRIES[x].flag + ' Переїхати до ' + COUNTRIES[x].name, sub: 'ти громадянин — без віз', f: function () { return emigrate(s, x, 'повернення'); } }); });
+    if (s.immigrant && isCitizen(s, s.birth)) o.unshift({ t: COUNTRIES[s.birth].flag + ' Повернутися додому', sub: COUNTRIES[s.birth].name, f: function () { return emigrate(s, s.birth, 'повернення'); } });
     return { title: 'Шанси на переїзд цього року', text: 'Тобі трапилися такі варіанти; інші можуть зʼявитися наступного року. Шанс залежить від освіти, мови країни, досвіду й відкритості. Після переїзду платять менше, поки не вивчиш мову і не адаптуєшся; мова підтягується сама, якщо живеш там.', opts: o.length ? o : [{ t: 'Немає варіантів', sub: 'потрібна освіта від коледжу або вік до 30 для навчання', f: function () { return 'Поки варіантів немає.'; } }] };
   } });
 function yearsWorked(s) { return s.workYears; }

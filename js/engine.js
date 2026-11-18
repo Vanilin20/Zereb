@@ -71,6 +71,7 @@ function newLife(o) {
   var urban = o.urban != null ? o.urban : chance(c.urban);
   var ns = NAMES[c.names];
   var s = {
+    citizen: [c.code], status: 'citizen',
     v: 2, id: Date.now() + '-' + ri(0, 99999), sandbox: !!o.sandbox,
     first: o.name || pick(sex === 'm' ? ns.m : ns.f), last: pick(ns.s), sex: sex, pref: o.pref || 'opp',
     birth: c.code, country: c.code, countries: [c.code], urban: urban, q: q, d: d,
@@ -142,12 +143,12 @@ function jobPay(s) {
     // без диплома: платять за реальну майстерність, а не за папірець
     p *= 0.75 + 0.5 * mastery(s, s.job.hobby, skillNeed(s, s.job.hobby, j.alt[s.job.hobby]));
   }
-  p *= immFactor(s) * (s.job.bonus || 1) * (s.payLuck || 1);
+  p *= immFactor(s) * (s.job.bonus || 1) * (s.payLuck || 1) * (s.immigrant && resStatus(s) === 'illegal' ? 0.6 : 1);
   if (s.job.part) p *= 0.45;
   if (s.econ > 0 && j.g) p *= 1.05;
   return p;
 }
-function pension(s) { var c = C(s); return c.median * c.pens * (0.6 + Math.min(40, s.workYears) / 50) * (s.immigrant && s.immYrs < 15 ? 0.6 : 1); }
+function pension(s) { var c = C(s); return c.median * c.pens * (0.6 + Math.min(40, s.workYears) / 50) * (isCitizen(s) ? 1 : resStatus(s) === 'pr' ? 0.8 : 0.4); }
 function netWorth(s) {
   var w = s.money + s.inv.dep + s.inv.stk + s.inv.cry - s.debt;
   if (s.home) w += s.home.val;
@@ -239,6 +240,7 @@ function offerChance(s, j) {
   if (s.age > 55) p *= 0.7;
   p *= 1 + Math.min(0.2, s.friends * 0.03);   // знайомі підказують вакансії
   if (hasRecord(s)) p *= 0.6;
+  if (s.immigrant && resStatus(s) === 'illegal') p *= j.edu <= 2 ? 0.5 : 0.05;   // без документів — лише неформальна робота
   if (cf(s) === 2) p *= 0.85;
   return clamp(p, 0.03, 0.97);
 }
@@ -613,7 +615,7 @@ function finTick(s, ownerPay, side) {
   if (s.retired) { inc += pension(s); I('Пенсія', pension(s)); }
   if (s.pol && s.pol.office > 0) { var ps = polSalary(s); inc += ps; I('Зарплата на посаді', ps); }
   var adult = s.age >= 18;
-  if (adult && !s.job && !s.study && !s.retired && !s.biz.length && c.gdp > 30) { inc += c.median * 0.3; I('Допомога з безробіття', c.median * 0.3); }
+  if (adult && !s.job && !s.study && !s.retired && !s.biz.length && c.gdp > 30 && (isCitizen(s) || resStatus(s) === 'pr')) { inc += c.median * 0.3; I('Допомога з безробіття', c.median * 0.3); }
   var rent = 0; s.rentals.forEach(function (r) { r.val *= 1 + 0.01 + 0.05 * gauss() + s.econ * 0.05; rent += r.val * (0.42 / c.house); }); inc += rent; I('Оренда твоїх квартир', rent);
   if (s.home) s.home.val *= 1 + 0.01 + 0.05 * gauss() + s.econ * 0.05;
   var pshare = 0;
@@ -815,6 +817,7 @@ function ageUp(s) {
   jobTick(s);
   gangTick(s, out);
   polTick(s, out);
+  citTick(s, out);
   kidsAdultTick(s);
   var op = bizTick(s, out);
   finTick(s, op, side);
