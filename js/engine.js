@@ -874,7 +874,9 @@ function gangRisk(s) {
   var g2 = s.gang, c = C(s), narco = NARCO.indexOf(s.country) >= 0;
   return {
     death: [0.012, 0.02, 0.03, 0.04, 0.05][g2.rank] * (narco ? (cartel(s) ? 1.5 : 1.8) : 1) * (s.gangWar ? 2.5 : 1) * (g2.warYrs > 0 ? 2 : 1) * (s.used.lowkey ? 0.6 : 1),
-    arrest: clamp((0.03 + g2.rank * 0.015 + (g2.heat || 0) * 0.03) * (0.15 + c.law * 1.2) * (s.used.bribe ? 0.35 : 1) * (s.used.lowkey ? 0.6 : 1) * (cartel(s) ? 0.4 : 1), 0.004, 0.8)
+    // нижчі звання роблять «брудну» роботу на вулиці, верхівка прикрита людьми й купленими поліцейськими;
+    // але в країнах із сильним законом за верхівкою полюють роками (як у справах RICO)
+    arrest: clamp(([0.06, 0.05, 0.035, 0.025, 0.02][g2.rank] + (g2.heat || 0) * 0.025) * (0.15 + c.law * 1.2) * (s.used.bribe ? Math.max(0.15, 0.4 - g2.rank * 0.06) : 1) * (s.used.lowkey ? 0.6 : 1) * (cartel(s) ? 0.4 : 1) * (c.law > 0.7 && g2.rank >= 3 ? 1.4 : 1), 0.003, 0.8)
   };
 }
 function gangTick(s, out) {
@@ -889,7 +891,7 @@ function gangTick(s, out) {
   s.gangWar = false;
   if (chance(r.death)) { die(s, pick(['загинув' + g(s, '', 'ла') + ' у розборках', 'вбивство конкурентами', 'перестрілка з поліцією'])); return; }
   if (chance(r.arrest)) {
-    var cp = court(s, 'участь в організованому угрупованні', 2 + g2.rank, 4 + g2.rank * 3);
+    var cp = court(s, g2.rank >= 3 ? 'керівництво злочинною організацією' : 'участь в організованому угрупованні', 2 + g2.rank * 2, 4 + g2.rank * 4);
     if (typeof cp === 'object') { cp.title = 'Арешт'; out.push(cp); } else say(s, cp, 'bad');
     return;
   }
