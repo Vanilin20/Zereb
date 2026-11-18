@@ -211,7 +211,7 @@ ev('parentill', [25, 70], 3, function (s) { return s.parents.some(function (p) {
   var p = pick(s.parents.filter(function (x) { return x.alive && x.age > 55; })); var cost = treatCost(s, 0.7);
   p.ill = true;
   return { text: p.role + ' тяжко захворі' + (p.sex === 'f' ? 'ла' : 'в') + '. Лікування коштує ' + fmt(cost) + '.', opts: [
-    O('Оплатити лікування', function () { if (s.money >= cost) s.money -= cost; else { s.debt += cost - s.money; s.money = 0; } if (chance(.7)) p.ill = false; p.rel += 15; return 'Ти оплатив' + g(s, '', 'ла') + ' лікування. ' + (p.ill ? 'Але стан важкий.' : p.role + ' одужує.'); }),
+    O('Оплатити лікування', function () { if (s.money >= cost) s.money -= cost; else { addDebt(s, cost - s.money, 'лікування батьків'); s.money = 0; } if (chance(.7)) p.ill = false; p.rel += 15; return 'Ти оплатив' + g(s, '', 'ла') + ' лікування. ' + (p.ill ? 'Але стан важкий.' : p.role + ' одужує.'); }),
     O('Доглядати самому', function () { add(s, { happy: -6 }); if (s.job) s.job.perf -= 10; p.rel += 10; if (chance(.4)) p.ill = false; return 'Ти доглядаєш ' + (p.sex === 'f' ? 'маму' : 'тата') + ' сам' + g(s, '', 'а') + '.'; }),
     O('Не можу допомогти', function () { add(s, { happy: -8 }); return 'Тобі нічим допомогти.'; })] };
 });
@@ -224,7 +224,7 @@ ev('kidtrouble', [30, 70], 3, function (s) { return s.kids.some(function (k) { r
 ev('kiduni', [35, 75], 4, function (s) { return s.kids.some(function (k) { return k.alive && k.age === 17; }); }, function (s) {
   var k = s.kids.filter(function (x) { return x.alive && x.age === 17; })[0]; var cost = Math.max(M(s) * 0.3, C(s).fee * M(s) * 4);
   return { text: k.name + ' вступає до університету. Допоможеш з оплатою (' + fmt(cost) + ' за все навчання)?', opts: [
-    O('Оплатити', function () { if (s.money >= cost) s.money -= cost; else { s.debt += cost - s.money; s.money = 0; } k.rel += 15; k.edu = 1; return 'Ти оплатив' + g(s, '', 'ла') + ' навчання ' + k.name + '.'; }),
+    O('Оплатити', function () { if (s.money >= cost) s.money -= cost; else { addDebt(s, cost - s.money, 'навчання дитини'); s.money = 0; } k.rel += 15; k.edu = 1; return 'Ти оплатив' + g(s, '', 'ла') + ' навчання ' + k.name + '.'; }),
     O('Нехай заробить сам' + gp(k, '', 'а'), function () { k.rel -= 8; return k.name + ' піде працювати й вчитися заочно.'; })] };
 });
 ev('reunion', [30, 65], 2, null, function (s) { add(s, { social: 3, happy: 4 }); if (chance(.3)) s.friends++; return 'Зустріч випускників. Хтось розбагатів, хтось розлучився, хтось зовсім не змінився.'; });
@@ -427,7 +427,7 @@ ev('remit', [20, 65], 5, function (s) { return s.immigrant && s.parents.some(fun
     O('Поки не можу', function () { s.parents.forEach(function (p) { p.rel -= 5; }); return 'Самому б вижити.'; })] };
 });
 ev('studloan', [18, 24], 6, function (s) { return s.study && s.study.t === 'uni' && C(s).feeType === 'high' && s.d <= 7 && !s.flags.loan; }, function (s) {
-  s.flags.loan = 1; var a = tuition(s, 'uni') * 3; s.debt += a; return 'Ти ' + g(s, 'взяв', 'взяла') + ' студентський кредит на ' + fmt(a) + '. (Факт: американці винні за студентськими кредитами ≈1,7 трлн $ — Federal Reserve, 2024.)';
+  s.flags.loan = 1; var a = tuition(s, 'uni') * 3; addDebt(s, a, 'студентський кредит'); return 'Ти ' + g(s, 'взяв', 'взяла') + ' студентський кредит на ' + fmt(a) + '. (Факт: американці винні за студентськими кредитами ≈1,7 трлн $ — Federal Reserve, 2024.)';
 }, true);
 ev('heat', [0, 95], 2, function (s) { return ['IN', 'PK', 'BD', 'SA', 'AE', 'IQ', 'EG', 'SD', 'ML', 'NE', 'MX'].indexOf(s.country) >= 0; }, function (s) { add(s, { health: s.age > 65 ? -6 : -2 }); return 'Аномальна спека: +45° у тіні. ' + (s.age > 65 ? 'Літнім людям у таку погоду особливо важко.' : 'Вночі не заснути.'); });
 ev('commute', [18, 65], 3, function (s) { return s.job && s.urban && !(s.own && s.own.car) && C(s).gdp > 5; }, function (s) { add(s, { happy: -2 }); return 'Дорога на роботу — півтори години в один бік у переповненому транспорті.'; });
@@ -598,7 +598,7 @@ ev('medbill', [18, 85], 3, function (s) { return C(s).health === 'paid' && !s.jo
   return { text: 'Швидка, ніч у лікарні, аналізи — рахунок на ' + fmt(bill) + '. Страховки в тебе немає.', opts: [
     O('Платити повністю', function () { s.money -= bill; return 'Оплачено. Заощаджень майже не лишилося.'; }),
     O('Торгуватися з лікарнею', function () { if (chance(0.5 + s.st.social / 300)) { s.money -= bill * 0.5; return 'Після десятка дзвінків рахунок урізали вдвічі.'; } s.money -= bill; return 'Лікарня не поступилася.'; }),
-    O('Не платити', function () { s.debt += bill * 1.3; s.credit = clamp(s.credit - 20); return 'Рахунок передали колекторам. Кредитний рейтинг упав.'; })] };
+    O('Не платити', function () { addDebt(s, bill * 1.3, 'медичний рахунок'); s.credit = clamp(s.credit - 20); return 'Рахунок передали колекторам. Кредитний рейтинг упав.'; })] };
 });
 ev('inflation', [18, 90], 4, function (s) { return ['AR', 'TR', 'NG', 'EG', 'LK', 'IR', 'VE', 'ZW', 'UA', 'PK', 'GH'].indexOf(s.country) >= 0 && s.money > M(s) * 0.3; }, function (s) {
   return { text: 'Інфляція понад 50% на рік: ціни в магазині міняються щотижня, заощадження в місцевій валюті тануть.', opts: [

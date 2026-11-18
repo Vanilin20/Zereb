@@ -1,7 +1,7 @@
 // ЖЕРЕБ — інтерфейс
 (function () {
   var S = null, Q = [], tab = 'sched';
-  var GROUPS = [{ id: 'sched', n: 'Розклад' }, { id: 'life', n: 'Життя', tabs: ['me', 'love', 'edu', 'move'] }, { id: 'work', n: 'Робота', tabs: ['work', 'hobby', 'biz', 'risk'] }, { id: 'money', n: 'Гроші', tabs: ['money'] }];
+  var GROUPS = [{ id: 'sched', n: 'Розклад' }, { id: 'budget', n: 'Бюджет' }, { id: 'life', n: 'Життя', tabs: ['me', 'love', 'edu', 'move'] }, { id: 'work', n: 'Робота', tabs: ['work', 'hobby', 'biz', 'risk'] }, { id: 'money', n: 'Гроші', tabs: ['money'] }];
   var TAB_N = { me: 'Я і здоровʼя', love: 'Люди', edu: 'Освіта', move: 'Переїзд', work: 'Робота', hobby: 'Навички й курси', biz: 'Бізнес', risk: 'Тіньове', money: 'Гроші й покупки' };
   var $ = function (id) { return document.getElementById(id); };
   var KEY = 'zhereb_save_v2', SKEY = 'zhereb_saves_v3', GKEY = 'zhereb_graves_v1', MAXSAVES = 12;
@@ -167,7 +167,7 @@
   }
   function renderTabs() {
     $('tabs').innerHTML = GROUPS.map(function (t) {
-      var any = t.id === 'sched' ? S.age >= 4 : t.tabs.some(function (x) { return availableActions(S, x).length; });
+      var any = t.id === 'sched' ? S.age >= 4 : t.id === 'budget' ? S.age >= 6 : t.tabs.some(function (x) { return availableActions(S, x).length; });
       if (!any) return '';
       return '<button type="button" class="tab' + (t.id === tab ? ' on' : '') + '" data-t="' + t.id + '">' + t.n + '</button>';
     }).join('');
@@ -197,8 +197,60 @@
       r.onchange = function () { dragging = false; save(); };
     });
   }
+  // ---------- Бюджет і графіки ----------
+  function chart(id, series, isMoney) {
+    var cv = document.getElementById(id); if (!cv) return;
+    var w = cv.clientWidth || 300, h = cv.clientHeight || 120, dpr = window.devicePixelRatio || 1;
+    cv.width = w * dpr; cv.height = h * dpr; var x = cv.getContext('2d'); x.scale(dpr, dpr);
+    var all = []; series.forEach(function (sr) { sr.d.forEach(function (p) { all.push(p); }); });
+    if (all.length < 2) { x.fillStyle = '#8f97a3'; x.font = '12px Manrope, sans-serif'; x.fillText('Ще мало даних', 8, h / 2); return; }
+    var x0 = all[0][0], x1 = all[0][0], y0 = 0, y1 = 0;
+    all.forEach(function (p) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); });
+    if (y1 === y0) y1 = y0 + 1;
+    var L = 44, B = 18, T = 8, Rr = 8;
+    function px(v) { return L + (v - x0) / Math.max(1, x1 - x0) * (w - L - Rr); }
+    function py(v) { return T + (1 - (v - y0) / (y1 - y0)) * (h - T - B); }
+    x.strokeStyle = '#2a313b'; x.lineWidth = 1; x.fillStyle = '#8f97a3'; x.font = '10.5px Manrope, sans-serif';
+    [y0, (y0 + y1) / 2, y1].forEach(function (v) { x.beginPath(); x.moveTo(L, py(v)); x.lineTo(w - Rr, py(v)); x.stroke(); var lab = isMoney ? money(v).replace(/\s(₴|€)$/, '$1') : Math.round(v); x.fillText(lab, 2, py(v) + 3); });
+    if (y0 < 0) { x.strokeStyle = '#4a515c'; x.beginPath(); x.moveTo(L, py(0)); x.lineTo(w - Rr, py(0)); x.stroke(); }
+    x.fillText(x0 + ' р.', L, h - 4); x.fillText(x1 + ' р.', w - Rr - 26, h - 4);
+    series.forEach(function (sr) {
+      x.strokeStyle = sr.c; x.lineWidth = 2; x.beginPath();
+      sr.d.forEach(function (p, i) { if (i) x.lineTo(px(p[0]), py(p[1])); else x.moveTo(px(p[0]), py(p[1])); }); x.stroke();
+      var lp = sr.d[sr.d.length - 1]; x.fillStyle = sr.c; x.beginPath(); x.arc(px(lp[0]), py(lp[1]), 3, 0, 7); x.fill();
+    });
+  }
+  function chartsHTML(p) { return '<div class="chart"><div class="ch-t"><span><i style="background:#f0a830"></i>Статок</span><span><i style="background:#5ab4c8"></i>Дохід за рік</span></div><canvas id="' + p + 'c1"></canvas></div>' +
+    '<div class="chart"><div class="ch-t"><span><i style="background:#5cc48c"></i>Здоровʼя</span><span><i style="background:#e8675b"></i>Щастя</span></div><canvas id="' + p + 'c2"></canvas></div>'; }
+  function drawCharts(p) {
+    var hs = S.hist || [];
+    chart(p + 'c1', [{ c: '#f0a830', d: hs.map(function (r) { return [r[0], r[1]]; }) }, { c: '#5ab4c8', d: hs.map(function (r) { return [r[0], r[2]]; }) }], true);
+    chart(p + 'c2', [{ c: '#5cc48c', d: hs.map(function (r) { return [r[0], r[3]]; }) }, { c: '#e8675b', d: hs.map(function (r) { return [r[0], r[4]]; }) }], false);
+  }
+  function renderBudget() {
+    var L = S.ledger, box = $('acts'), h = '';
+    if (!L) { box.innerHTML = '<div class="none">Бюджет зʼявиться після першого прожитого року.</div>'; return; }
+    function rows(o, sign) { var ks = Object.keys(o).sort(function (a, b) { return o[b] - o[a]; }); return ks.map(function (k) { return '<div class="kv"><span>' + esc(k) + '</span><span class="' + (sign > 0 ? 'pos' : 'neg') + '">' + (sign > 0 ? '+' : '−') + esc(fmt(o[k])).replace(/^−/, '') + '</span></div>'; }).join(''); }
+    var ti = 0, te = 0; for (var a in L.inc) ti += L.inc[a]; for (var b in L.exp) te += L.exp[b];
+    h += '<div class="sched-head"><div class="row"><b>Рік, коли тобі було ' + (L.age - 1) + '→' + L.age + '</b><span>' + L.year + '</span></div>' +
+      '<div class="row"><span>Надійшло</span><b class="pos">' + esc(fmt(ti)) + '</b></div><div class="row"><span>Витрачено</span><b class="neg">' + esc(fmt(te)) + '</b></div>' +
+      '<div class="row"><span>Результат</span><b class="' + (ti - te >= 0 ? 'pos' : 'neg') + '">' + esc(fmt(ti - te)) + '</b></div></div>';
+    h += '<div class="sec">Доходи</div>' + (rows(L.inc, 1) || '<div class="none">Немає</div>');
+    h += '<div class="sec">Витрати</div>' + (rows(L.exp, -1) || '<div class="none">Немає</div>');
+    if (L.invGain && Math.abs(L.invGain) > 1) h += '<div class="kv"><span>Інвестиції за рік (не готівка)</span><span class="' + (L.invGain > 0 ? 'pos' : 'neg') + '">' + esc(fmt(L.invGain)) + '</span></div>';
+    if (S.debt > 0 || L.short) {
+      h += '<div class="sec">Борг</div><div class="kv"><span>Зараз винен</span><span class="neg">' + esc(fmt(S.debt)) + '</span></div><div class="kv"><span>Ставка</span><span>13% на рік' + (L.interest ? ' · за рік нараховано ' + esc(fmt(L.interest)) : '') + '</span></div>';
+      if (L.short) h += '<div class="note">Минулого року на життя не вистачило ' + esc(fmt(L.short)) + ' — ця сума пішла в борг.</div>';
+      var src = S.debtSrc || {}, ssum = 0; for (var q in src) ssum += src[q]; var kf = ssum > 0 ? S.debt / ssum : 0; src = Object.keys(src).reduce(function (o, q) { if (src[q] * kf >= 1) o[q] = src[q] * kf; return o; }, {}); Object.keys(src).sort(function (a, b) { return src[b] - src[a]; }).forEach(function (k) { h += '<div class="kv"><span>— ' + esc(k) + '</span><span>' + esc(fmt(src[k])) + '</span></div>'; });
+      h += '<div class="note">Борг гаситься автоматично половиною вільних грошей щороку. Кредитний рейтинг: ' + Math.round(S.credit) + '.</div>';
+    }
+    h += '<div class="sec">Як змінювалося життя</div>' + chartsHTML('b');
+    box.innerHTML = cur(h);
+    drawCharts('b');
+  }
   function renderActs() {
     if (tab === 'sched') { renderSched(); return; }
+    if (tab === 'budget') { renderBudget(); return; }
     var grp = GROUPS.filter(function (x) { return x.id === tab; })[0] || GROUPS[1], box = $('acts');
     box.innerHTML = '';
     var anyA = false;
@@ -234,6 +286,7 @@
     if (S.job && !S.job.teen) { h += kv('Посада', jobTitle(S)) + kv('Зарплата до податків', fmt(jobPay(S)) + '/рік') + kv('Податок на зарплату', '~' + Math.round(taxRate(S, jobPay(S)) * 100) + '%' + (C(S).flat ? ' (плоска шкала)' : '')) + kv('Продуктивність', Math.round(S.job.perf)) + kv('Стаж тут', yrs(S.job.yrs)); }
     else h += kv('Статус', jobTitle(S));
     if (hasRecord(S)) h += kv('Судимість', 'так, знижує шанси на роботу');
+    if (S.pol) h += kv('Політика', offices(S)[S.pol.office] + ' · ' + partyName(S.pol.party)) + kv('Рейтинг', Math.round(S.pol.approval) + '%' + (S.pol.office ? ' · термін ще ' + S.pol.term + ' р.' : '')) + kv('Наступні вибори', S.pol.nextElec <= S.age ? 'цього року' : 'через ' + (S.pol.nextElec - S.age) + ' р.');
     if (S.gang) { var gr = gangRisk(S); h += kv(S.gang.kind === 'картель' ? 'Картель' : 'Сімʼя', rankName(S.gang) + (S.gang.own ? ' · людей: ' + (S.gang.size || 1) : '') + (S.gang.warYrs ? ' · війна ще ' + S.gang.warYrs + ' р.' : '')) + kv('Ризик загинути / арешту', pct(gr.death) + ' / ' + pct(gr.arrest) + ' на рік'); }
     if (S.fame > 3) h += kv('Слава', Math.round(S.fame));
     h += '<h3>Гроші</h3>' + kv('Готівка', fmt(S.money)) + (S.debt ? kv('Борг', fmt(S.debt)) : '') +
@@ -261,8 +314,8 @@
     h += '<h3>Люди</h3>';
     S.parents.forEach(function (p) { h += '<div class="ppl"><span class="' + (p.alive ? '' : 'dead') + '">' + p.role + ' ' + esc(p.name) + ', ' + p.age + '</span>' + (p.alive ? ' · стосунки ' + Math.round(p.rel) : '') + '</div>'; });
     if (S.sibs.length) h += '<div class="ppl">Брати й сестри: ' + S.sibs.map(function (b) { return '<span class="' + (b.alive ? '' : 'dead') + '">' + esc(b.name) + ' (' + b.age + ')</span>'; }).join(', ') + '</div>';
-    if (S.partner) h += '<div class="ppl">' + (S.partner.married ? gp(S.partner, 'Чоловік', 'Дружина') : 'Пара') + ': ' + esc(S.partner.name) + ', ' + S.partner.age + ' · стосунки ' + Math.round(S.partner.rel) + '</div>';
-    if (S.kids.length) h += '<div class="ppl">Діти: ' + S.kids.map(function (k) { return '<span class="' + (k.alive ? '' : 'dead') + '">' + esc(k.name) + ' (' + k.age + ')</span>'; }).join(', ') + '</div>';
+    if (S.partner) h += '<div class="ppl">' + (S.partner.married ? gp(S.partner, 'Чоловік', 'Дружина') : 'Пара') + ': ' + esc(S.partner.name) + ', ' + S.partner.age + ' · стосунки ' + Math.round(S.partner.rel) + (S.partner.trait ? '<br><small class="note">' + esc(ptrait(S.partner)) + ' · хоче дітей: ' + esc(S.partner.wantKids) + (S.partner.jobless ? ' · без роботи' : '') + (S.partner.far ? ' · на відстані' : '') + '</small>' : '') + '</div>';
+    if (S.kids.length) h += '<div class="ppl">Діти:</div>' + S.kids.map(function (k) { return '<div class="ppl"><span class="' + (k.alive ? '' : 'dead') + '">' + esc(k.name) + ', ' + k.age + '</span> · стосунки ' + Math.round(k.rel) + '<br><small class="note">' + [k.job ? esc(k.job) : '', k.uni ? 'університет' : '', k.talent && k.talent.indexOf('_lost') < 0 ? 'талант' : '', k.rebel ? 'бунтар' : '', k.abroad ? 'живе: ' + COUNTRIES[k.abroad].name : '', k.married ? 'одружен' + gp(k, 'ий', 'а') : ''].filter(Boolean).join(' · ') + '</small></div>'; }).join('');
     if (S.grandkids) h += '<div class="ppl">Онуків: ' + S.grandkids + '</div>';
     h += '<div class="ppl">Друзів: ' + S.friends + '</div>';
     h += '<h3>Країна</h3>' + kv('Де живеш', c.flag + ' ' + c.name) + rulesHTML(c) + kv('Тривалість життя', c.le + ' р.') + kv('Економіка', S.econ < 0 ? 'криза' : S.econ > 0 ? 'підйом' : 'стабільна') + (cf(S) ? kv('Безпека', cf(S) === 2 ? 'війна' : 'напружено') : '') + (S.immigrant ? kv('Адаптація', yrs(S.immYrs)) : '');
@@ -316,10 +369,11 @@
       '<div class="kv"><span>Країни</span><span>' + S.countries.map(function (x) { return COUNTRIES[x].flag + ' ' + COUNTRIES[x].name; }).join(' → ') + '</span></div>' +
       '<div class="kv"><span>Діти / онуки</span><span>' + S.kids.length + ' / ' + S.grandkids + '</span></div>' +
       '<div class="kv"><span>Шлюбів</span><span>' + S.marriages + '</span></div>';
+    h += '<h2>Життя в графіках</h2>' + chartsHTML('e');
     h += '<h2>Досягнення</h2><div class="ach">' + ACHIEVEMENTS.map(function (a) { var on = sm.ach.indexOf(a) >= 0; return '<span class="' + (on ? '' : 'off') + '" title="' + esc(a.d) + '">' + esc(a.n) + '</span>'; }).join('') + '</div>';
     h += '<h2>Головне</h2><div class="tl">' + S.tl.map(function (t) { return '<div><b>' + t.age + '</b>' + esc(t.t) + '</div>'; }).join('') + '</div>';
     h += '<div class="end-btns"><button class="btn primary" id="eAgain" type="button">Ще одне життя</button><button class="btn ghost" id="eHub" type="button">До хабу</button><button class="btn ghost" id="eSand" type="button">Пісочниця</button><button class="btn ghost" id="eCopy" type="button">Скопіювати підсумок</button><button class="btn ghost" id="eLog" type="button">Перечитати життєпис</button><button class="btn link" id="eGraves" type="button">Минулі життя</button></div></div>';
-    $('end').innerHTML = cur(h); show('end'); $('end').scrollTop = 0;
+    $('end').innerHTML = cur(h); show('end'); drawCharts('e'); $('end').scrollTop = 0;
     $('eAgain').onclick = function () { born({}); };
     $('eHub').onclick = startScreen;
     $('eSand').onclick = sandbox;

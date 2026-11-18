@@ -33,6 +33,7 @@ function freeHours(s) {
   if (s.job) h -= s.job.teen ? 0 : s.job.part ? 20 : 40;
   s.biz.forEach(function (b) { h -= b.mgr ? 4 : b.effort >= 1 ? 45 : 22; });
   if (s.gang) h -= 15;
+  if (s.pol) h -= polHours(s);
   h -= chores(s);
   if (s.chronic) h -= s.chronic.length * 2;   // лікарі, процедури, втома
   var small = s.kids.filter(function (k) { return k.alive && k.age < 12; }).length;
@@ -113,6 +114,7 @@ function hoursBreakdown(s) {
   if (s.job && !s.job.teen) r.push(['робота', s.job.part ? 20 : 40]);
   var bz = 0; s.biz.forEach(function (b) { bz += b.mgr ? 4 : b.effort >= 1 ? 45 : 22; }); if (bz) r.push(['бізнес', bz]);
   if (s.gang) r.push(['угруповання', 15]);
+  if (s.pol) r.push(['політика', polHours(s)]);
   var ch = chores(s); if (ch) r.push([s.age < 18 ? 'допомога вдома' : 'догляд за батьками', ch]);
   var small = s.kids.filter(function (k) { return k.alive && k.age < 12; }).length; if (small) r.push(['малі діти', Math.round(Math.min(24, small * 8) * (s.partner ? 0.6 : 1))]);
   if (s.job || s.study) r.push(['дорога', s.own && s.own.car ? 3 : s.urban ? 7 : 5]);

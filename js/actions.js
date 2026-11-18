@@ -134,7 +134,7 @@ function jobOptions(s, apps) {
   });
   return { title: 'Вакансії цього року', text: 'Це те, що трапилося тобі цього року (у місті вакансій більше). До 3 заявок. Нові вакансії — наступного року. Безробіття в країні: ' + Math.round(C(s).unemp * 100) + '%.', opts: opts.length ? opts : [{ t: 'Цього року нічого підходящого', sub: 'підвищуй освіту чи навички або переїдь у місто', f: function () { return 'Підходящих вакансій не трапилося.'; } }] };
 }
-A({ id: 'findjob', tab: 'work', n: 'Шукати роботу', d: function (s) { return 'До 3 заявок' + (hasRecord(s) ? ' · судимість знижує шанси' : ''); }, show: function (s) { return s.age >= 16 && !s.retired; }, run: function (s) { var o = yearly(s, 'jobapps', function () { return 3; }); return jobOptions(s, o.v); } });
+A({ id: 'findjob', tab: 'work', n: 'Шукати роботу', d: function (s) { return 'До 3 заявок' + (hasRecord(s) ? ' · судимість знижує шанси' : ''); }, show: function (s) { return s.age >= 16 && !s.retired && !(s.pol && s.pol.office >= 2); }, run: function (s) { var o = yearly(s, 'jobapps', function () { return 3; }); return jobOptions(s, o.v); } });
 A({ id: 'teenjob', tab: 'work', n: 'Підробіток', d: 'Кишенькові гроші', show: function (s) { return s.age >= 13 && s.age < 18; },
   run: function (s) { var ok = TEEN_JOBS.filter(function (t) { return !t.need || Object.keys(t.need).every(function (k) { return skillVal(s, k) >= t.need[k]; }); }); var t = pick(ok); var e = M(s) * t.pay; s.money += e; add(s, { happy: -1, social: 1 }); return t.n + ' — заробив' + g(s, '', 'ла') + ' ' + fmt(e) + '.'; } });
 A({ id: 'work', tab: 'work', n: 'Працювати на повну', d: 'Продуктивність ↑ (шанс підвищення), щастя ↓', show: function (s) { return s.job && !s.job.teen; },
@@ -172,8 +172,8 @@ A({ id: 'propose', tab: 'love', n: 'Запропонувати шлюб', d: 'П
   run: function (s) { var p = s.partner; if (chance(clamp((p.rel - 30) / 50, 0.05, 0.95))) { p.married = true; s.marriages++; var cost = M(s) * 0.3 * [0.5, 1, 3][s.ls]; s.money -= cost; add(s, { happy: 15 }); mark(s, 'Весілля з ' + p.name); return p.name + ' сказал' + gp(p, '', 'а') + ' «так»! Весілля коштувало ' + fmt(cost) + '.'; } p.rel -= 10; add(s, { happy: -8 }); return p.name + ' поки не готов' + gp(p, 'ий', 'а') + '.'; } });
 A({ id: 'baby', tab: 'love', n: 'Завести дитину', d: function (s) { return fertility(s) ? 'Шанс ~' + Math.round(fertility(s) * 100) + '% за рік' : 'Усиновлення'; }, show: function (s) { return s.partner && s.age >= 18 && s.age < 55 && s.partner.rel > 40; },
   run: function (s) {
-    var adopt = !fertility(s);
-    if (adopt ? chance(0.4) : chance(fertility(s))) {
+    var adopt = !fertility(s), pk = s.partner && s.partner.wantKids === 'ні' && !s.flags.tryKids ? 0.3 : 1;
+    if (adopt ? chance(0.4 * pk) : chance(fertility(s) * pk)) {
       var sx = chance(0.51) ? 'm' : 'f'; var k = { name: nameFrom(s.country, sx), sex: sx, age: 0, alive: true, rel: 80 };
       s.kids.push(k); add(s, { happy: 12 }); mark(s, (s.kids.length === 1 ? 'Перша дитина: ' : 'Дитина: ') + k.name);
       return (adopt ? 'Ви усиновили ' : 'У вас ' + (sx === 'm' ? 'народився син' : 'народилася донька') + ' — ') + k.name + '!';
@@ -207,7 +207,7 @@ A({ id: 'home', tab: 'money', n: 'Купити житло', ap: 0, d: function (
     var o = [['Квартира', 1], ['Будинок', 1.8]].map(function (h) {
       var cost = M(s) * C(s).house * h[1], down = cost * 0.2;
       return { t: h[0] + ' — ' + fmt(cost), sub: s.money >= cost ? 'одразу' : s.money >= down && s.lastInc > 0 && canBorrow(s) ? 'іпотека: перший внесок ' + fmt(down) : !canBorrow(s) ? 'банк не дає іпотеку (рейтинг ' + Math.round(s.credit) + ')' : 'не вистачає грошей', dis: !(s.money >= cost || (s.money >= down && s.lastInc > 0 && canBorrow(s))),
-        f: function () { if (s.money >= cost) s.money -= cost; else { s.money -= down; s.debt += cost - down; } s.home = { kind: h[0], val: cost }; s.withParents = false; mark(s, 'Власне житло'); add(s, { happy: 10 }); return 'У тебе тепер власн' + (h[0] === 'Квартира' ? 'а квартира' : 'ий будинок') + '!'; } };
+        f: function () { if (s.money >= cost) s.money -= cost; else { s.money -= down; addDebt(s, cost - down, 'іпотека'); } s.home = { kind: h[0], val: cost }; s.withParents = false; mark(s, 'Власне житло'); add(s, { happy: 10 }); return 'У тебе тепер власн' + (h[0] === 'Квартира' ? 'а квартира' : 'ий будинок') + '!'; } };
     });
     return { title: 'Житло', text: 'Власне житло — без оренди. Ціни в країні: ' + C(s).name + '.', opts: o };
   } });
