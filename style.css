@@ -263,3 +263,21 @@ select, input[type=text] { width: 100%; background: var(--raise); color: var(--t
 .ch-t { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
 .ch-t i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
 .end-inner .chart canvas { height: 170px; }
+
+/* Телефон: компактна шапка, більше місця журналу */
+@media (max-width: 720px) {
+  .who { flex: 1 1 0; min-width: 0; order: 1; }
+  .who .name, .who .sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #btnHub, #btnProfile, #btnMenu { order: 2; flex: 0 0 auto; }
+  .money { order: 3; flex: 1 1 100%; }
+  .money .lbl { font-size: 10px; }
+  .toast { top: auto; bottom: 96px; }
+  .actions { max-height: 42%; }
+  .tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs .tab { flex: 0 0 auto; }
+  .bars { padding: 6px 12px; gap: 4px 14px; }
+  .bar .meter { height: 4px; }
+}
+.epi { font-size: 18px; line-height: 1.5; border-left: 3px solid var(--accent, #f0a830); padding: 4px 0 4px 14px; margin: 22px 0 6px; font-style: italic; }
+@media (max-width: 720px) { .who > div { min-width: 0; flex: 1 1 auto; } }

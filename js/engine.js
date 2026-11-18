@@ -547,7 +547,8 @@ function familyTick(s) {
         var heirs = 1 + s.sibs.filter(function (x) { return x.alive; }).length;
         var inh = (s.flags.elite ? s.fam : bc.median * [0, 0, 0, 0.4, 1, 1.8, 3, 5, 10, 40][s.d - 1] * rnd(0.5, 1.5)) / heirs;
         if (s.flags.elite) s.fam = 0;
-        s.money += inh; cashNote(s, 'Спадщина', inh); txt += ' Тобі дісталася спадщина: ' + fmt(inh) + '.';
+        if (heirs > 1 && !s.flags.elite) { s.pendInh = { total: inh * heirs, heirs: heirs }; txt += ' Лишилася спадщина — її треба поділити з рідними.'; }
+        else { s.money += inh; cashNote(s, 'Спадщина', inh); txt += ' Тобі дісталася спадщина: ' + fmt(inh) + '.'; }
       }
       var gk = s.gen.heart > s.gen.cancer ? 'heart' : 'cancer';
       if (p.age < 75 && s.gen[gk] > 1.15 && !s.flags.genKnown) { s.flags.genKnown = gk; txt += ' Причина — ' + (gk === 'heart' ? 'серце' : 'рак') + '. Лікарі кажуть, у тебе підвищений спадковий ризик.'; }
@@ -739,8 +740,6 @@ function statsTick(s) {
 // ---------- Світ ----------
 function worldTick(s) {
   if (s.econT > 0) { s.econT--; if (s.econT === 0) s.econ = 0; }
-  else if (s.age >= 1 && chance(0.1)) { s.econ = -1; s.econT = ri(1, 2); say(s, 'У світі економічна криза: скорочення, падіння ринків.', 'bad'); }
-  else if (s.age >= 1 && chance(0.12)) { s.econ = 0.5; s.econT = ri(1, 3); say(s, 'Економіка на підйомі.', 'good'); }
   COUNTRY_LIST.forEach(function (c) {
     var l = s.cf[c.code] != null ? s.cf[c.code] : c.conflict;
     if (l > 0 && chance(0.05)) { l--; if (c.code === s.country) say(s, l === 0 ? 'У країні настав мир.' : 'Бойові дії в країні вщухають.', 'good'); }
@@ -760,7 +759,7 @@ function deathCheck(s) {
     if (s.flags.ill) mod *= s.flags.illTreated ? 1.4 : 2.5;
     mod = clamp(mod, 0.35, 6);
     mod *= 1 + cf(s) * 0.1;
-    q = hazard(c, s.age) * mod * 0.52;
+    q = hazard(c, s.age) * mod * 0.47;
   }
   if (chance(q)) { die(s, deathCause(s)); return true; }
   return false;
@@ -812,7 +811,11 @@ function ageUp(s) {
   if (!s.nolog) s.log.push(s.cur);
   var side = schedTick(s);
   worldTick(s);
+  crisisTick(s, out);
   familyTick(s);
+  careTick(s, out);
+  armyTick(s, out);
+  if (!s.alive) return out;
   eduTick(s, out);
   jobTick(s);
   gangTick(s, out);

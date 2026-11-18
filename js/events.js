@@ -230,8 +230,8 @@ ev('kiduni', [35, 75], 4, function (s) { return s.kids.some(function (k) { retur
 ev('reunion', [30, 65], 2, null, function (s) { add(s, { social: 3, happy: 4 }); if (chance(.3)) s.friends++; return 'Зустріч випускників. Хтось розбагатів, хтось розлучився, хтось зовсім не змінився.'; });
 ev('flirt', [25, 60], 2, function (s) { return s.partner && s.partner.married; }, function (s) {
   return { text: 'Колега відверто фліртує з тобою.', opts: [
-    O('Чітко зупинити', function () { s.partner.rel += 3; return 'Ти поставив' + g(s, '', 'ла') + ' межу.'; }),
-    O('Піддатися', function () { if (chance(.5)) { s.partner.rel -= 40; add(s, { happy: -10 }); return s.partner.name + ' дізнал' + gp(s.partner, 'ся', 'ася') + ' про зраду.'; } add(s, { happy: 3 }); return 'Ніхто нічого не дізнався. Поки що.'; })] };
+    O('Чітко зупинити', function () { if (!s.partner) return 'Вже неактуально.'; s.partner.rel += 3; return 'Ти поставив' + g(s, '', 'ла') + ' межу.'; }),
+    O('Піддатися', function () { if (!s.partner) return 'Вже неактуально.'; if (chance(.5)) { s.partner.rel -= 40; add(s, { happy: -10 }); return s.partner.name + ' дізнал' + gp(s.partner, 'ся', 'ася') + ' про зраду.'; } add(s, { happy: 3 }); return 'Ніхто нічого не дізнався. Поки що.'; })] };
 });
 ev('checkup', [40, 80], 2, null, function (s) {
   if (chance(0.08 + (s.age - 40) / 300)) getIll(s, pick(['рак на ранній стадії', 'проблеми із серцем', 'цукровий діабет', 'гіпертонія', 'хвороба нирок']));
