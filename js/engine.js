@@ -636,7 +636,7 @@ function finTick(s, ownerPay, side) {
   // витрати
   var exp = 0;
   if (!adult && s.withParents) {
-    var pocket = s.flags.elite ? c.median * 1.5 : c.median * [0.001, 0.002, 0.0035, 0.005, 0.008, 0.011, 0.015, 0.021, 0.032, 0.07][s.d - 1];
+    var pocket = s.flags.elite ? c.median * 1.5 : c.median * [0.001, 0.003, 0.005, 0.008, 0.012, 0.02, 0.035, 0.06, 0.12, 0.3][s.d - 1];
     s.money += pocket + inc; I('Кишенькові від батьків', pocket);
     inc = 0; pshare = 0; exp = ownUpkeep(s) * 0.5; E('Утримання речей', exp);
   } else {

@@ -223,3 +223,49 @@ function life2Tick(s, out) { supportTick(s); remoteTick(s); dreamTick(s, out); i
 ACHIEVEMENTS.push({ id: 'dream', n: 'Мрія збулася', d: 'Здійснити мрію життя', t: function (s) { return (s.dreamsDone || []).length > 0; } });
 ACHIEVEMENTS.push({ id: 'ladder', n: 'З низів', d: 'Народитися в 1–3 децилі й завершити в 8–10', t: function (s) { return s.d <= 3 && s.age >= 30 && lifeDecile(s) >= 8; } });
 ACHIEVEMENTS.push({ id: 'remote', n: 'Світова зарплата', d: 'Працювати віддалено на іноземну компанію', t: function (s) { return s.tl.some(function (x) { return /Віддалена робота/.test(x.t); }); } });
+
+// ======================================================================
+// Родина при народженні має значення: приватна школа, зв'язки, допомога батьків, утримання бідних батьків
+// ======================================================================
+function parentsAlive(s) { return s.parents.some(function (p) { return p.alive; }); }
+function familyLuckTick(s, out) {
+  var c = C(s), d = s.d;
+  // приватна школа: вирішують батьки
+  if (s.age === 7 && s.study && s.study.t === 'school' && !s.priv && d >= 6 && c.gdp > 4) {
+    if (d >= 8 || s.flags.elite) { s.priv = 1; s.q = Math.min(5, s.q + 1); say(s, 'Батьки перевели тебе до приватної школи: малі класи, сильні вчителі, «правильні» знайомства.', 'good'); }
+    else out.push({ title: 'Приватна школа', text: 'Батьки думають про приватну школу. Для родини це дорого — доведеться відмовлятися від відпусток і ремонту.', opts: [
+      { t: 'Приватна школа', sub: 'кращі оцінки й шанси на вступ, але батьки в напрузі', f: function () { s.priv = 1; s.q = Math.min(5, s.q + 1); s.parents.forEach(function (p) { p.rel -= 4; }); return 'Нова школа, нові вимоги. Батьки затягнули паски.'; } },
+      { t: 'Звичайна школа', sub: 'без жертв', f: function () { return 'Ти лишаєшся у звичайній школі з друзями.'; } }] });
+  }
+  // приватна школа підтягує оцінки
+  if (s.priv && s.study && s.study.t === 'school') s.gpa = clamp(s.gpa + 2.5);
+  // бідність заважає вчитися: немає репетиторів, книжок, тиші вдома, треба допомагати по господарству
+  if (s.study && s.study.t === 'school' && d <= 3) s.gpa = clamp(s.gpa - (4 - d) * 0.8);
+  if (s.study && s.study.t === 'school' && d >= 8 && !s.priv) s.gpa = clamp(s.gpa + 1);
+  // допомога батьків у 22–32
+  if (s.age >= 22 && s.age <= 32 && !s.parentGift && d >= 4 && parentsAlive(s) && !s.prison && chance(0.25)) {
+    s.parentGift = 1;
+    var gift = c.median * [0, 0, 0, 0.3, 0.5, 0.8, 1.5, 3, 6, 15][d - 1] * (s.flags.elite ? 10 : 1) * rnd(0.7, 1.3);
+    var o = [
+      { t: 'На житло', sub: 'перший внесок або вся квартира', f: function () { s.money += gift; cashNote(s, 'Допомога батьків', gift); s.flags.homeGift = 1; return 'Батьки дали ' + fmt(gift) + ' на житло. ' + (gift > M(s) * 4 ? 'Цього вистачить на квартиру.' : 'Вистачить на перший внесок.'); } },
+      { t: 'Стартовий капітал на справу', sub: 'гроші плюс батьківські поради й знайомства', f: function () { s.money += gift; cashNote(s, 'Допомога батьків', gift); s.flags.bizGift = 1; return 'Батьки вклали ' + fmt(gift) + ' у твою майбутню справу. Тато обіцяє звести з потрібними людьми.'; } },
+      { t: 'Відмовитися — сам' + g(s, '', 'а') + ' впораюся', sub: 'гордість і незалежність', f: function () { add(s, { happy: 3 }); s.parents.forEach(function (p) { p.rel += 5; }); return 'Батьки поважають твоє рішення. Пропозиція лишається в силі — якщо що.'; } }];
+    out.push({ title: 'Батьки хочуть допомогти', text: 'Батьки пропонують ' + fmt(gift) + '. На що?', opts: o });
+  }
+  // бідні родини: дорослі діти утримують старих батьків
+  if (d <= 3 && s.age >= 25) {
+    var old = s.parents.filter(function (p) { return p.alive && p.age >= 60; }).length;
+    if (old && s.lastInc > 0) { var sup = s.lastInc * 0.06 * old * (c.gdp < 10 ? 1.5 : 1); s.money -= sup; cashNote(s, 'Допомога батькам', -sup); }
+  }
+}
+(function () {
+  // зв'язки родини при пошуку роботи
+  var oc = offerChance;
+  offerChance = function (s, j) { var p = oc(s, j); var d = s.flags.elite ? 12 : s.d; return clamp(p * (1 + (d - 5) * 0.04) * (s.priv && j.edu >= 5 ? 1.1 : 1), 0.03, 0.97); };
+  // приватна школа допомагає вступити
+  var ac = admitChance;
+  admitChance = function (s, f, kind) { return clamp(ac(s, f, kind) + (s.priv && !kind ? 0.1 : 0) + (s.d - 5) * 0.01, 0.03, 0.95); };
+  // бізнес з батьківськими знайомствами живе довше
+  var lt = life2Tick;
+  life2Tick = function (s, out) { lt(s, out); familyLuckTick(s, out); };
+})();
