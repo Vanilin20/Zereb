@@ -44,7 +44,7 @@ function citTick(s, out) {
   if ((st === 'visa' || st === 'refugee') && s.immYrs >= R2.pr && (s.job || s.biz.length || st === 'refugee' || (s.partner && s.partner.married)) && !hasRecord(s) && !s.prAsked) {
     s.prAsked = s.age;
     var fee = M(s) * 0.05;
-    out.push({ title: 'Посвідка на постійне проживання', text: 'Ти прожив' + g(s, '', 'ла') + ' у ' + c.name + ' ' + s.immYrs + ' р. Можна подаватися на постійне проживання.', opts: [
+    out.push({ title: 'Посвідка на постійне проживання', text: 'Ти прожи' + g(s, 'в', 'ла') + ' у ' + c.name + ' ' + s.immYrs + ' р. Можна подаватися на постійне проживання.', opts: [
       { t: 'Подати документи', sub: fmt(fee) + ' · потрібні легальна робота й мова', f: function () { s.money -= fee; if (chance(0.45 + lang / 200 + (s.job ? 0.15 : 0))) { s.status = 'pr'; mark(s, 'Постійне проживання: ' + c.name); return 'Отримано посвідку на постійне проживання.'; } s.prAsked = s.age - 2; return 'Відмова: «недостатньо підстав». Спробуєш за кілька років.'; } },
       { t: 'Поки не подаватися', f: function () { s.prAsked = s.age - 3; return 'Може, згодом.'; } }] });
     return;
@@ -56,7 +56,7 @@ function citTick(s, out) {
     var keepOld = R2.dual && NO_DUAL_ORIGIN.indexOf(s.birth) < 0, nf = M(s) * 0.04;
     var ok = lang >= R2.lang;
     out.push({ title: 'Громадянство', text: 'Ти вже ' + s.immYrs + ' р. у ' + c.name + '. Можна подаватися на громадянство: іспит з мови й історії.' + (ok ? '' : ' Мови поки замало (' + Math.round(lang) + ' з ' + R2.lang + ').') + (keepOld ? '' : ' Але громадянство ' + COUNTRIES[s.birth].name + ' доведеться втратити.'), opts: [
-      { t: 'Скласти іспит', sub: fmt(nf) + (ok ? '' : ' · шанси низькі'), dis: s.money < nf, f: function () { s.money -= nf; if (chance(ok ? 0.6 + s.st.smarts / 250 : 0.15)) { if (!keepOld) { var i = s.citizen.indexOf(s.birth); if (i >= 0) s.citizen.splice(i, 1); } s.citizen.push(c.code); s.status = 'citizen'; mark(s, 'Став' + g(s, '', 'ла') + ' громадянином ' + c.name); add(s, { happy: 10 }); return 'Присяга, новий паспорт — ти тепер громадян' + g(s, 'ин', 'ка') + ' ' + c.name + ' ' + c.flag + '.' + (keepOld ? ' І старе громадянство лишається.' : ''); } return 'Іспит не складено. Наступна спроба — за два роки.'; } },
+      { t: 'Скласти іспит', sub: fmt(nf) + (ok ? '' : ' · шанси низькі'), dis: s.money < nf, f: function () { s.money -= nf; if (chance(ok ? 0.6 + s.st.smarts / 250 : 0.15)) { if (!keepOld) { var i = s.citizen.indexOf(s.birth); if (i >= 0) s.citizen.splice(i, 1); } s.citizen.push(c.code); s.status = 'citizen'; mark(s, 'Ста' + g(s, 'в', 'ла') + ' громадянином ' + c.name); add(s, { happy: 10 }); return 'Присяга, новий паспорт — ти тепер громадян' + g(s, 'ин', 'ка') + ' ' + c.name + ' ' + c.flag + '.' + (keepOld ? ' І старе громадянство лишається.' : ''); } return 'Іспит не складено. Наступна спроба — за два роки.'; } },
       { t: 'Не подаватися', sub: keepOld ? '' : 'зберегти громадянство ' + COUNTRIES[s.birth].name, f: function () { return 'Ти лишаєшся з посвідкою на постійне проживання.'; } }] });
   }
 }

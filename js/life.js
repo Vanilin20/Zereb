@@ -88,7 +88,7 @@ A({ id: 'politics', tab: 'work', n: 'Піти в політику', d: function 
 A({ id: 'campaign', tab: 'work', n: 'Балотуватися', d: function (s) { return 'Наступні вибори: ' + (s.pol.nextElec <= s.age ? 'цього року' : 'через ' + (s.pol.nextElec - s.age) + ' р.'); }, show: function (s) { return s.pol && !s.prison && s.pol.nextElec <= s.age && polTargets(s).length > 0; },
   run: function (s) { var offs = offices(s); return { title: 'Куди балотуватися?', text: 'Посада: ' + offs[s.pol.office].toLowerCase() + '. Рейтинг: ' + Math.round(s.pol.approval) + '%.', opts: polTargets(s).map(function (tg) { return { t: offs[tg], sub: tg >= 2 ? 'повна зайнятість — роботу доведеться залишити' : 'можна поєднувати з роботою', f: function () { return campaign(s, tg); } }; }) }; } });
 A({ id: 'leavepol', tab: 'work', n: 'Піти з політики', ap: 0, d: function (s) { return s.pol ? offices(s)[s.pol.office] : ''; }, show: function (s) { return !!s.pol; },
-  run: function (s) { var o = offices(s)[s.pol.office]; s.polPast = s.pol; s.pol = null; return 'Ти пішов' + g(s, '', 'ла') + ' з політики (' + o.toLowerCase() + ').'; } });
+  run: function (s) { var o = offices(s)[s.pol.office]; s.polPast = s.pol; s.pol = null; return 'Ти піш' + g(s, 'ов', 'ла') + ' з політики (' + o.toLowerCase() + ').'; } });
 
 function polTick(s, out) {
   var P = s.pol; if (!P || s.prison) return;
@@ -99,10 +99,10 @@ function polTick(s, out) {
     if (P.term > 0) P.term--;
     if (P.term === 0) {
       var lim = P.office === 5 && P.terms >= 2 && !autocracy(s);
-      if (lim) { mark(s, 'Завершив' + g(s, '', 'ла') + ' два терміни: ' + offs[5].toLowerCase()); say(s, 'Два терміни позаду — більше балотуватися не можна. Ти йдеш з посади як колишній ' + offs[5].toLowerCase() + '.', 'big'); s.polPast = P; s.pol = null; s.flags.exPres = 1; return; }
+      if (lim) { mark(s, 'Заверши' + g(s, 'в', 'ла') + ' два терміни: ' + offs[5].toLowerCase()); say(s, 'Два терміни позаду — більше балотуватися не можна. Ти йдеш з посади як колишній ' + offs[5].toLowerCase() + '.', 'big'); s.polPast = P; s.pol = null; s.flags.exPres = 1; return; }
       out.push({ title: 'Кінець терміну', text: 'Термін на посаді «' + offs[P.office].toLowerCase() + '» закінчується. Рейтинг: ' + Math.round(P.approval) + '%.', opts: [
         { t: 'Йти на переобрання', f: function () { return campaign(s, P.office === 4 ? 3 : P.office); } },
-        { t: 'Піти з політики', f: function () { s.polPast = P; s.pol = null; return 'Ти не став' + g(s, '', 'ла') + ' переобиратися.'; } }] });
+        { t: 'Піти з політики', f: function () { s.polPast = P; s.pol = null; return 'Ти не ста' + g(s, 'в', 'ла') + ' переобиратися.'; } }] });
       return;
     }
   }
@@ -145,7 +145,7 @@ ev('pol_scandal', [21, 90], 2, function (s) { return s.pol && s.pol.office >= 1 
   return { title: 'Розслідування журналістів', text: 'Журналісти опублікували докази твоїх «сірих» оборудок.', opts: [
     { t: 'Подати до суду на журналістів', f: function () { if (!s.pol) return ''; if (C(s).law < 0.5 && chance(0.6)) { P.approval -= 3; return 'Свій суд став на твій бік. Скандал затих.'; } P.approval -= 15; return 'Суд програно — і тепер про це пишуть ще більше.'; } },
     { t: 'Вибачитися й повернути гроші', f: function () { if (!s.pol) return ''; P.approval -= 8; P.dirty = 0; s.money -= Math.min(s.money, M(s) * 2); return 'Ти вибачи' + g(s, 'вся', 'лася') + '. Частина виборців пробачила.'; } },
-    { t: 'Піти у відставку', f: function () { if (!s.pol) return ''; s.polPast = P; s.pol = null; return 'Ти пішов' + g(s, '', 'ла') + ' з політики до того, як стало гірше.'; } }] };
+    { t: 'Піти у відставку', f: function () { if (!s.pol) return ''; s.polPast = P; s.pol = null; return 'Ти піш' + g(s, 'ов', 'ла') + ' з політики до того, як стало гірше.'; } }] };
 });
 ACHIEVEMENTS.push({ id: 'pres', n: 'Глава держави', d: 'Стати президентом або премʼєром', t: function (s) { return (s.pol && s.pol.office === 5) || (s.polPast && s.polPast.office === 5) || s.flags.exPres; } });
 ACHIEVEMENTS.push({ id: 'mayor', n: 'Мер', d: 'Виграти вибори мера', t: function (s) { return s.tl.some(function (x) { return /^Мер/.test(x.t); }); } });
@@ -156,28 +156,28 @@ function ptrait(p) { var m = p.sex === 'm'; return p.trait.map(function (t) { re
 function enrichPartner(p) { if (p.trait) return p; p.trait = wsample(P_TRAITS, 2, function () { return 1; }); p.wantKids = pick(['так', 'так', 'можливо', 'ні']); return p; }
 ev('p_money', [18, 90], 3, function (s) { return s.partner && (s.debt > M(s) * 0.3 || (s.partner.trait && s.partner.trait.indexOf('марнотратн') >= 0)); }, function (s) {
   var p = enrichPartner(s.partner);
-  return { text: 'Ви з ' + p.name + ' сваритеся через гроші: ' + (s.debt > M(s) * 0.3 ? 'борги тиснуть на обох.' : p.name + ' знову купив' + gp(p, '', 'ла') + ' щось дороге.'), opts: [
+  return { text: 'Ви з ' + p.name + ' сваритеся через гроші: ' + (s.debt > M(s) * 0.3 ? 'борги тиснуть на обох.' : p.name + ' знову купи' + gp(p, 'в', 'ла') + ' щось дороге.'), opts: [
     { t: 'Завести спільний бюджет', f: function () { if (!s.partner) return ''; if (chance(0.6)) { p.rel += 8; return 'Таблиця витрат, чесні розмови — стало спокійніше.'; } p.rel -= 5; return 'Бюджет не прижився, сварки тривають.'; } },
     { t: 'Окремі рахунки', f: function () { if (!s.partner) return ''; p.rel -= 2; return 'Кожен сам за себе. Тихо, але трохи холодніше.'; } },
     { t: 'Посваритися як слід', f: function () { if (!s.partner) return ''; p.rel -= 12; add(s, { happy: -5 }); return 'Посварилися. Кілька днів не розмовляли.'; } }] };
 });
 ev('p_kids', [22, 42], 3, function (s) { var p = s.partner; return p && enrichPartner(p) && !s.kids.length && p.yrs >= 2 && p.wantKids !== 'можливо'; }, function (s) {
   var p = s.partner;
-  return { text: p.wantKids === 'так' ? p.name + ' дуже хоче дітей і питає, коли ви будете готові.' : p.name + ' зізнал' + gp(p, 'ся', 'ася') + ', що не хоче дітей. Взагалі.', opts: [
+  return { text: p.wantKids === 'так' ? p.name + ' дуже хоче дітей і питає, коли ви будете готові.' : p.name + ' зізна' + gp(p, 'вся', 'лася') + ', що не хоче дітей. Взагалі.', opts: [
     { t: p.wantKids === 'так' ? 'Погодитися спробувати' : 'Прийняти це', f: function () { if (!s.partner) return ''; p.rel += 8; if (p.wantKids === 'так') s.flags.tryKids = 1; return 'Ви домовилися. Стало легше.'; } },
     { t: 'Запропонувати почекати', f: function () { if (!s.partner) return ''; p.rel -= 4; return 'Питання відклали. Але воно нікуди не зникло.'; } },
-    { t: 'Сказати, що для тебе це принципово', f: function () { if (!s.partner) return ''; if (chance(0.4)) { p.wantKids = p.wantKids === 'так' ? 'ні' : 'так'; p.rel -= 3; return p.name + ' подумал' + gp(p, '', 'а') + ' і змінил' + gp(p, '', 'а') + ' думку.'; } p.rel -= 20; return 'Розмова закінчилася сльозами. Під питанням майбутнє.'; } }] };
+    { t: 'Сказати, що для тебе це принципово', f: function () { if (!s.partner) return ''; if (chance(0.4)) { p.wantKids = p.wantKids === 'так' ? 'ні' : 'так'; p.rel -= 3; return p.name + ' подума' + gp(p, 'в', 'ла') + ' і зміни' + gp(p, 'в', 'ла') + ' думку.'; } p.rel -= 20; return 'Розмова закінчилася сльозами. Під питанням майбутнє.'; } }] };
 });
 ev('p_abroad', [22, 55], 2, function (s) { return s.partner && s.partner.yrs >= 1 && s.age < 55; }, function (s) {
   var p = s.partner, d = pick(EMIGRATE_TO.filter(function (c) { return c !== s.country; }));
-  return { text: p.name + ' отримал' + gp(p, '', 'а') + ' пропозицію роботи в ' + COUNTRIES[d].name + ' ' + COUNTRIES[d].flag + '. Зарплата значно більша.', opts: [
+  return { text: p.name + ' отрима' + gp(p, 'в', 'ла') + ' пропозицію роботи в ' + COUNTRIES[d].name + ' ' + COUNTRIES[d].flag + '. Зарплата значно більша.', opts: [
     { t: 'Переїхати разом', f: function () { if (!s.partner) return ''; p.inc *= 1.8; p.rel += 10; return emigrate(s, d, 'переїзд за партнером'); } },
     { t: 'Стосунки на відстані', f: function () { if (!s.partner) return ''; p.inc *= 1.8; p.rel -= 15; p.far = 1; return 'Тепер ви бачитеся раз на кілька місяців.'; } },
-    { t: 'Попросити відмовитися', f: function () { if (!s.partner) return ''; if (chance(0.6)) { p.rel -= 10; return p.name + ' лишил' + gp(p, 'ся', 'ася') + ', але це запамʼятає.'; } s.partner = null; s.exes++; add(s, { happy: -12 }); return p.name + ' поїхал' + gp(p, '', 'а') + ' сам' + gp(p, '', 'а') + '. Ви розійшлися.'; } }] };
+    { t: 'Попросити відмовитися', f: function () { if (!s.partner) return ''; if (chance(0.6)) { p.rel -= 10; return p.name + ' лиши' + gp(p, 'вся', 'лася') + ', але це запамʼятає.'; } s.partner = null; s.exes++; add(s, { happy: -12 }); return p.name + ' поїха' + gp(p, 'в', 'ла') + ' сам' + gp(p, '', 'а') + '. Ви розійшлися.'; } }] };
 });
 ev('p_jobloss', [20, 65], 2, function (s) { return s.partner && !s.partner.jobless && s.partner.age < 64; }, function (s) {
   var p = s.partner; p.jobless = 1;
-  return { text: p.name + ' втратив' + gp(p, '', 'ла') + ' роботу.', opts: [
+  return { text: p.name + ' втрати' + gp(p, 'в', 'ла') + ' роботу.', opts: [
     { t: 'Підтримати: «знайдеш, коли будеш готов' + gp(p, 'ий', 'а') + '»', f: function () { if (!s.partner) return ''; p.rel += 8; return 'Це було важливо для ' + p.name + '. Пошук затягнувся, але ви разом.'; } },
     { t: 'Допомогти з пошуком і резюме', f: function () { if (!s.partner) return ''; if (chance(0.6)) { p.jobless = 0; p.inc *= rnd(0.9, 1.2); return 'Через два місяці ' + p.name + ' знайш' + gp(p, 'ов', 'ла') + ' нову роботу.'; } return 'Поки нічого не знайшлося.'; } },
     { t: 'Дати зрозуміти, що треба швидше', f: function () { if (!s.partner) return ''; p.rel -= 10; if (chance(0.5)) p.jobless = 0; return 'Тиск подіяв — але осад лишився.'; } }] };
@@ -210,24 +210,24 @@ ev('k_talent', [24, 70], 4, function (s) { return s.kids.some(function (k) { ret
 });
 ev('k_teen', [28, 75], 4, function (s) { return s.kids.some(function (k) { return k.alive && k.age >= 13 && k.age <= 17; }); }, function (s) {
   var k = pick(s.kids.filter(function (x) { return x.alive && x.age >= 13 && x.age <= 17; }));
-  var it = pick([['повертається додому о третій ночі', 'Заборонити гуляти', 'Домовитися про години'], ['зависає з компанією, яка тобі не подобається', 'Заборонити ці зустрічі', 'Познайомитися з цими друзями'], ['хоче кинути школу і стати блогером', 'Категорично ні', 'Домовитися: спершу атестат'], ['закохал' + gp(k, 'ся', 'ася') + ' і забув' + gp(k, '', 'ла') + ' про навчання', 'Посадити за уроки', 'Поговорити по-дорослому']]);
+  var it = pick([['повертається додому о третій ночі', 'Заборонити гуляти', 'Домовитися про години'], ['зависає з компанією, яка тобі не подобається', 'Заборонити ці зустрічі', 'Познайомитися з цими друзями'], ['хоче кинути школу і стати блогером', 'Категорично ні', 'Домовитися: спершу атестат'], ['закоха' + gp(k, 'вся', 'лася') + ' і забу' + gp(k, 'в', 'ла') + ' про навчання', 'Посадити за уроки', 'Поговорити по-дорослому']]);
   return { text: gp(k, 'Син', 'Донька') + ' ' + k.name + ' ' + it[0] + '.', opts: [
     { t: it[1], f: function () { k.rel -= 10; if (chance(0.4)) { k.rebel = 1; return k.name + ' грюкну' + gp(k, 'в', 'ла') + ' дверима. Тепер усе робить навпаки.'; } return 'Подіяло. Але стосунки похолоднішали.'; } },
-    { t: it[2], f: function () { if (chance(0.5 + k.rel / 300)) { k.rel += 8; return 'Домовилися. ' + k.name + ' навіть подякував' + gp(k, '', 'ла') + '.'; } k.rel -= 3; return 'Домовленість протрималася тиждень.'; } },
+    { t: it[2], f: function () { if (chance(0.5 + k.rel / 300)) { k.rel += 8; return 'Домовилися. ' + k.name + ' навіть подякува' + gp(k, 'в', 'ла') + '.'; } k.rel -= 3; return 'Домовленість протрималася тиждень.'; } },
     { t: 'Відпустити ситуацію', f: function () { if (chance(0.3)) { k.rebel = 1; return 'Без контролю стало гірше.'; } return 'Минуло саме собою.'; } }] };
 });
 ev('k_abroad', [40, 85], 2, function (s) { return s.kids.some(function (k) { return k.alive && k.age >= 18 && k.age <= 30 && !k.abroad; }); }, function (s) {
   var k = pick(s.kids.filter(function (x) { return x.alive && x.age >= 18 && x.age <= 30 && !x.abroad; })), d = pick(EMIGRATE_TO.filter(function (c) { return c !== s.country; }));
   return { text: k.name + ' хоче переїхати жити в ' + COUNTRIES[d].name + ' ' + COUNTRIES[d].flag + '.', opts: [
-    { t: 'Підтримати й допомогти грошима', sub: fmt(M(s) * 0.3), f: function () { s.money -= M(s) * 0.3; k.abroad = d; k.rel += 10; return k.name + ' поїхал' + gp(k, '', 'а') + ' з твоїм благословенням. Дзвоните щонеділі.'; } },
-    { t: 'Просто побажати успіху', f: function () { k.abroad = d; return k.name + ' поїхал' + gp(k, '', 'а') + '.'; } },
-    { t: 'Відмовляти', f: function () { if (chance(0.4)) { k.rel -= 5; return k.name + ' лишил' + gp(k, 'ся', 'ася') + ' — але питання ще повернеться.'; } k.abroad = d; k.rel -= 15; return k.name + ' все одно поїхал' + gp(k, '', 'а') + '. Тепер ви рідко розмовляєте.'; } }] };
+    { t: 'Підтримати й допомогти грошима', sub: fmt(M(s) * 0.3), f: function () { s.money -= M(s) * 0.3; k.abroad = d; k.rel += 10; return k.name + ' поїха' + gp(k, 'в', 'ла') + ' з твоїм благословенням. Дзвоните щонеділі.'; } },
+    { t: 'Просто побажати успіху', f: function () { k.abroad = d; return k.name + ' поїха' + gp(k, 'в', 'ла') + '.'; } },
+    { t: 'Відмовляти', f: function () { if (chance(0.4)) { k.rel -= 5; return k.name + ' лиши' + gp(k, 'вся', 'лася') + ' — але питання ще повернеться.'; } k.abroad = d; k.rel -= 15; return k.name + ' все одно поїха' + gp(k, 'в', 'ла') + '. Тепер ви рідко розмовляєте.'; } }] };
 });
 ev('k_wedding', [40, 90], 3, function (s) { return s.kids.some(function (k) { return k.alive && k.age >= 22 && !k.married; }); }, function (s) {
   var k = pick(s.kids.filter(function (x) { return x.alive && x.age >= 22 && !x.married; })), c2 = M(s) * 0.5;
   k.married = 1;
   return { text: k.name + ' одружується!', opts: [
-    { t: 'Оплатити весілля', sub: fmt(c2), f: function () { s.money -= c2; k.rel += 12; add(s, { happy: 8 }); return 'Гучне весілля, на якому ти плакав' + g(s, '', 'ла') + ' від щастя.'; } },
+    { t: 'Оплатити весілля', sub: fmt(c2), f: function () { s.money -= c2; k.rel += 12; add(s, { happy: 8 }); return 'Гучне весілля, на якому ти плака' + g(s, 'в', 'ла') + ' від щастя.'; } },
     { t: 'Подарувати скромну суму', sub: fmt(c2 * 0.2), f: function () { s.money -= c2 * 0.2; k.rel += 3; add(s, { happy: 5 }); return 'Скромне, але щире весілля.'; } },
     { t: 'Не подобається обранець', f: function () { k.rel -= 20; return 'Ти не прийш' + g(s, 'ов', 'ла') + ' на весілля. ' + k.name + ' цього не забуде.'; } }] };
 });
@@ -235,7 +235,7 @@ ev('k_loan', [45, 90], 2, function (s) { return s.money > M(s) && s.kids.some(fu
   var k = pick(s.kids.filter(function (x) { return x.alive && x.age >= 22; })), a = M(s) * rnd(0.5, 2);
   return { text: k.name + ' просить ' + fmt(a) + ' — на перший внесок за житло.', opts: [
     { t: 'Дати', f: function () { s.money -= a; k.rel += 12; return 'Тепер у ' + k.name + ' своє житло.'; } },
-    { t: 'Позичити, а не подарувати', f: function () { s.money -= a; k.rel += 3; if (chance(0.6)) { s.money += a; return k.name + ' повернув' + gp(k, '', 'ла') + ' борг за кілька років.'; } return 'Гроші так і не повернулися — але ви не сваритеся.'; } },
+    { t: 'Позичити, а не подарувати', f: function () { s.money -= a; k.rel += 3; if (chance(0.6)) { s.money += a; return k.name + ' поверну' + gp(k, 'в', 'ла') + ' борг за кілька років.'; } return 'Гроші так і не повернулися — але ви не сваритеся.'; } },
     { t: 'Відмовити', f: function () { k.rel -= 10; return 'Нехай вчиться сам' + gp(k, '', 'а') + '.'; } }] };
 });
 // Доросла дитина: карʼєра і допомога батькам

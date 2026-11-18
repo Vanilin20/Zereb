@@ -281,3 +281,13 @@ select, input[type=text] { width: 100%; background: var(--raise); color: var(--t
 }
 .epi { font-size: 18px; line-height: 1.5; border-left: 3px solid var(--accent, #f0a830); padding: 4px 0 4px 14px; margin: 22px 0 6px; font-style: italic; }
 @media (max-width: 720px) { .who > div { min-width: 0; flex: 1 1 auto; } }
+.log p.has-d { cursor: pointer; }
+.log p.has-d::after { content: ' ▾'; color: var(--muted); font-size: 11px; }
+.log p.has-d.open::after { content: ' ▴'; }
+.log .fx { display: none; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.log p.has-d.open .fx { display: flex; }
+.log .fx i { font-style: normal; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--raise, #1e232b); }
+.log .fx i.up { color: #6fcf8e; } .log .fx i.dn { color: #ef7a6c; }
+.mob { color: var(--muted); line-height: 1.5; margin: 6px 0 14px; }
+.rec { font-weight: 700; margin: 10px 0; }
+.seed-in { width: 100%; font: inherit; font-size: 20px; letter-spacing: .15em; text-transform: uppercase; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); margin-top: 6px; }

@@ -45,15 +45,15 @@ function crisisTick(s, out) {
 function pandemicPrompt(s) {
   var rich = C(s).gdp > 20, risk = s.age > 70 ? 0.3 : s.age > 50 ? 0.12 : 0.05;
   return { title: 'Пандемія', text: 'Як ти житимеш ці два роки?' + (rich ? '' : ' Вакцини до твоєї країни доїдуть пізніше.'), opts: [
-    { t: 'Суворо ізолюватися', sub: 'майже без ризику, але самотність і втрата доходу', f: function () { add(s, { happy: -10, social: -8 }); s.friends = Math.max(0, s.friends - 1); if (s.job && !s.job.teen && JOB[s.job.id] && ['dev', 'designer', 'writer', 'analyst', 'accountant'].indexOf(s.job.id) < 0 && chance(0.35)) { endJob(s, 'ізоляція'); return 'Ти пересидів' + g(s, '', 'ла') + ' пандемію вдома. Роботу, де треба було зʼявлятися особисто, втрачено.'; } return 'Два роки вдома. Здоровий' + g(s, '', 'а') + ', але дуже самотньо.'; } },
-    { t: 'Вакцинуватися й жити обережно', sub: rich ? 'баланс ризику й нормального життя' : 'чекати вакцину ~рік, поки є ризик', f: function () { s.flags.vax = 1; add(s, { happy: -4 }); if (chance(rich ? risk * 0.2 : risk * 0.6)) { add(s, { health: -15 }); return 'Ти все ж захворів' + g(s, '', 'ла') + ', але без найгіршого.'; } return 'Маска, щеплення, менше зустрічей. Пронесло.'; } },
-    { t: 'Жити як раніше', sub: 'нормальне життя й дохід, ризик для здоровʼя', f: function () { add(s, { social: 3 }); if (chance(risk * 2)) { add(s, { health: -25 }); if (s.age > 70 && chance(0.3)) { die(s, 'ускладнення вірусної інфекції'); return null; } return 'Тяжка хвороба: тижні в лікарні.'; } return 'Ти жив' + g(s, '', 'ла') + ' як раніше — і обійшлося.'; } }] };
+    { t: 'Суворо ізолюватися', sub: 'майже без ризику, але самотність і втрата доходу', f: function () { add(s, { happy: -10, social: -8 }); s.friends = Math.max(0, s.friends - 1); if (s.job && !s.job.teen && JOB[s.job.id] && ['dev', 'designer', 'writer', 'analyst', 'accountant'].indexOf(s.job.id) < 0 && chance(0.35)) { endJob(s, 'ізоляція'); return 'Ти пересиді' + g(s, 'в', 'ла') + ' пандемію вдома. Роботу, де треба було зʼявлятися особисто, втрачено.'; } return 'Два роки вдома. Здоровий' + g(s, '', 'а') + ', але дуже самотньо.'; } },
+    { t: 'Вакцинуватися й жити обережно', sub: rich ? 'баланс ризику й нормального життя' : 'чекати вакцину ~рік, поки є ризик', f: function () { s.flags.vax = 1; add(s, { happy: -4 }); if (chance(rich ? risk * 0.2 : risk * 0.6)) { add(s, { health: -15 }); return 'Ти все ж захворі' + g(s, 'в', 'ла') + ', але без найгіршого.'; } return 'Маска, щеплення, менше зустрічей. Пронесло.'; } },
+    { t: 'Жити як раніше', sub: 'нормальне життя й дохід, ризик для здоровʼя', f: function () { add(s, { social: 3 }); if (chance(risk * 2)) { add(s, { health: -25 }); if (s.age > 70 && chance(0.3)) { die(s, 'ускладнення вірусної інфекції'); return null; } return 'Тяжка хвороба: тижні в лікарні.'; } return 'Ти жи' + g(s, 'в', 'ла') + ' як раніше — і обійшлося.'; } }] };
 }
 function inflationPrompt(s) {
   var m = s.money;
   return { title: 'Гіперінфляція', text: 'У тебе ' + fmt(m) + ' готівкою в місцевій валюті. Щороку вони втрачатимуть третину вартості.', opts: [
     { t: 'Перевести в долари', sub: 'обмінники беруть ~8%', f: function () { s.money -= m * 0.08; s.flags.hedged = 1; return 'Заощадження тепер у доларах. Дорогий обмін, зате не згорять.'; } },
-    { t: 'Купити речі й техніку заздалегідь', sub: 'частина грошей у речах, решта горить', f: function () { s.money -= m * 0.4; add(s, { happy: 3 }); return 'Ти скупив' + g(s, '', 'ла') + ' потрібне за старими цінами. Решта грошей усе одно тане.'; } },
+    { t: 'Купити речі й техніку заздалегідь', sub: 'частина грошей у речах, решта горить', f: function () { s.money -= m * 0.4; add(s, { happy: 3 }); return 'Ти скупи' + g(s, 'в', 'ла') + ' потрібне за старими цінами. Решта грошей усе одно тане.'; } },
     { t: 'Тримати як є', sub: 'вірити, що мине', f: function () { return 'Ти тримаєш гривні... тобто місцеву валюту. Побачимо.'; } }] };
 }
 evOver('pandemic'); evOver('inflation');
@@ -89,15 +89,15 @@ function carePrompt(s, p) {
     { t: 'Забрати до себе', sub: '~10 год/тиждень на догляд, напруга в родині', f: function () { p.care = 'self'; p.rel = clamp(p.rel + 15); s.withParents = false; return who + ' тепер живе з тобою. Важко, але поруч.'; } },
     { t: 'Найняти доглядальницю', sub: '~' + fmt(careCost(s, 'nurse')) + '/рік', f: function () { p.care = 'nurse'; return 'Доглядальниця приходить щодня. ' + who + ' лишається вдома.'; } },
     { t: 'Будинок для літніх людей', sub: '~' + fmt(careCost(s, 'home')) + '/рік · ' + who.toLowerCase() + ' образиться', f: function () { p.care = 'home'; p.rel = clamp(p.rel - 15); return who + ' в будинку для літніх. Ти навідуєшся у вихідні.'; } }];
-  if (sib) o.push({ t: 'Попросити ' + gp(sib, 'брата', 'сестру') + ' ' + sib.name, sub: 'безкоштовно для тебе, але стосунки зіпсуються', f: function () { if (chance(0.5 + (sib.rel - 50) / 150)) { p.care = 'sib'; sib.rel = clamp(sib.rel - 10); return sib.name + ' погодил' + gp(sib, 'ся', 'ася') + ', але натякнув' + gp(sib, '', 'ла') + ', що запамʼятає.'; } sib.rel = clamp(sib.rel - 20); return { title: 'Відмова', text: sib.name + ' відмовляється: «Тепер твоя черга». Що робиш?', opts: o.slice(0, 3) }; } });
+  if (sib) o.push({ t: 'Попросити ' + gp(sib, 'брата', 'сестру') + ' ' + sib.name, sub: 'безкоштовно для тебе, але стосунки зіпсуються', f: function () { if (chance(0.5 + (sib.rel - 50) / 150)) { p.care = 'sib'; sib.rel = clamp(sib.rel - 10); return sib.name + ' погоди' + gp(sib, 'вся', 'лася') + ', але натякну' + gp(sib, 'в', 'ла') + ', що запамʼятає.'; } sib.rel = clamp(sib.rel - 20); return { title: 'Відмова', text: sib.name + ' відмовляється: «Тепер твоя черга». Що робиш?', opts: o.slice(0, 3) }; } });
   return { title: 'Батьки старіють', text: who + ', ' + p.name + ' (' + p.age + '), вже не може жити сам' + (p.sex === 'f' ? 'а' : '') + '. Хтось має доглядати.', opts: o };
 }
 function inhPrompt(s, I2) {
   var share = I2.total / I2.heirs, carer = s.parents.some(function (p) { return p.care === 'self'; }) || I2.carer;
   return { title: 'Спадщина', text: 'Батьки залишили ' + fmt(I2.total) + '. Спадкоємців: ' + I2.heirs + '. Порівну — по ' + fmt(share) + '.', opts: [
     { t: 'Поділити порівну', f: function () { s.money += share; cashNote(s, 'Спадщина', share); return 'Поділили порівну. Без сварок.'; } },
-    { t: 'Претендувати на більше', sub: carer ? 'ти доглядав' + g(s, '', 'ла') + ' батьків — є аргумент' : 'суд, юристи, зіпсовані стосунки', f: function () { var fee = I2.total * 0.08; if (chance(carer ? 0.65 : 0.25)) { var x = share * 1.6 - fee; s.money += x; cashNote(s, 'Спадщина', x); s.sibs.forEach(function (b) { b.rel = clamp(b.rel - 35); }); return 'Суд став на твій бік: ' + fmt(x) + ' після юристів. З братами й сестрами ви більше не говорите.'; } var y = share - fee; s.money += y; cashNote(s, 'Спадщина', y); s.sibs.forEach(function (b) { b.rel = clamp(b.rel - 40); }); add(s, { happy: -6 }); return 'Суд поділив порівну, юристи забрали своє. Родина розсварилася.'; } },
-    { t: 'Відмовитися на користь рідних', f: function () { s.sibs.forEach(function (b) { b.rel = clamp(b.rel + 25); }); add(s, { happy: 4 }); return 'Ти відмовил' + g(s, 'ся', 'ася') + ' від своєї частки. Рідні цього не забудуть.'; } }] };
+    { t: 'Претендувати на більше', sub: carer ? 'ти догляда' + g(s, 'в', 'ла') + ' батьків — є аргумент' : 'суд, юристи, зіпсовані стосунки', f: function () { var fee = I2.total * 0.08; if (chance(carer ? 0.65 : 0.25)) { var x = share * 1.6 - fee; s.money += x; cashNote(s, 'Спадщина', x); s.sibs.forEach(function (b) { b.rel = clamp(b.rel - 35); }); return 'Суд став на твій бік: ' + fmt(x) + ' після юристів. З братами й сестрами ви більше не говорите.'; } var y = share - fee; s.money += y; cashNote(s, 'Спадщина', y); s.sibs.forEach(function (b) { b.rel = clamp(b.rel - 40); }); add(s, { happy: -6 }); return 'Суд поділив порівну, юристи забрали своє. Родина розсварилася.'; } },
+    { t: 'Відмовитися на користь рідних', f: function () { s.sibs.forEach(function (b) { b.rel = clamp(b.rel + 25); }); add(s, { happy: 4 }); return 'Ти відмови' + g(s, 'вся', 'лася') + ' від своєї частки. Рідні цього не забудуть.'; } }] };
 }
 evOver('parentcare');
 
@@ -111,9 +111,9 @@ conscription = function (s) {
   var o = [
     { t: 'Відслужити', sub: term + (war ? ' · країна воює — ризик фронту' : ''), f: function () { s.flags.served = 1; mark(s, 'Строкова служба'); if (war && chance(0.3)) { s.army = { left: 1, front: 1 }; return 'Твій підрозділ відправили ближче до фронту.'; } add(s, { health: 4, social: 5, happy: -8, smarts: -1 }); s.friends++; return 'Служба позаду: дисципліна, армійські друзі й утома.'; } },
     { t: 'Відстрочка через навчання', sub: 'треба вступити до вишу', f: function () { return { title: 'Спеціальність', text: 'Студентам дають відстрочку.', opts: uniOpts(s) }; } },
-    { t: 'Підписати контракт', sub: 'стабільна зарплата, кар\'єра у війську', f: function () { s.flags.served = 1; takeJob(s, JOB.soldier); mark(s, 'Контракт зі збройними силами'); return 'Ти підписав' + g(s, '', 'ла') + ' контракт. Тепер це твоя професія.'; } },
+    { t: 'Підписати контракт', sub: 'стабільна зарплата, кар\'єра у війську', f: function () { s.flags.served = 1; takeJob(s, JOB.soldier); mark(s, 'Контракт зі збройними силами'); return 'Ти підписа' + g(s, 'в', 'ла') + ' контракт. Тепер це твоя професія.'; } },
     { t: 'Ухилитися', sub: c.law > 0.7 ? 'тут за це карають суворо' : 'можна відкупитися, але є ризик', f: function () { if (chance(c.law * 0.6)) { s.flags.dodger = 1; if (c.law > 0.8 && chance(0.5)) return court(s, 'ухилення від військової служби', 1, 2); s.money -= M(s) * 0.3; add(s, { happy: -6 }); return 'Тебе знайшли. Штраф ' + fmt(M(s) * 0.3) + ', і до армії все одно забрали.'; } s.flags.dodger = 1; add(s, { happy: -2 }); return 'Довідка від «знайомого лікаря» — і ти вільн' + g(s, 'ий', 'а') + '. Але в анкетах це питання ще спливатиме.'; } }];
-  if (CIVIL_SERVICE.indexOf(c.code) >= 0) o.splice(1, 0, { t: 'Альтернативна (цивільна) служба', sub: 'довше, але без зброї', f: function () { s.flags.served = 1; add(s, { happy: -5, social: 3, smarts: 1 }); return 'Ти рік працював' + g(s, '', 'ла') + ' в лікарні замість казарми.'; } });
+  if (CIVIL_SERVICE.indexOf(c.code) >= 0) o.splice(1, 0, { t: 'Альтернативна (цивільна) служба', sub: 'довше, але без зброї', f: function () { s.flags.served = 1; add(s, { happy: -5, social: 3, smarts: 1 }); return 'Ти рік працюва' + g(s, 'в', 'ла') + ' в лікарні замість казарми.'; } });
   return { title: 'Повістка', text: 'Тобі 18 — час на строкову службу в ' + c.name + ' (' + term + (c.consc === 2 ? '; тут служать і жінки, і чоловіки' : '') + ').', opts: o };
 };
 function armyTick(s, out) {
@@ -122,14 +122,14 @@ function armyTick(s, out) {
     var pay = c.median * (A2.front ? 1.6 : 0.8); s.money += pay; cashNote(s, 'Грошове забезпечення військового', pay);
     if (A2.front) {
       add(s, { happy: -8, health: -3 });
-      if (chance(0.03)) { die(s, 'загинув' + g(s, '', 'ла') + ' на фронті'); return; }
+      if (chance(0.03)) { die(s, 'загину' + g(s, 'в', 'ла') + ' на фронті'); return; }
       if (chance(0.1)) { add(s, { health: -25 }); s.flags.wounded = 1; say(s, 'Тяжке поранення. Шпиталь, реабілітація.', 'bad'); }
       if (chance(0.15)) s.flags.ptsd = 1;
     }
     if (--A2.left <= 0) {
       s.army = null; s.flags.veteran = 1; mark(s, A2.front ? 'Ветеран війни' : 'Демобілізація');
-      if (A2.job && JOB[A2.job.id]) { s.job = A2.job; say(s, 'Ти повернув' + g(s, 'ся', 'лася') + ' з війська. Роботодавець зберіг за тобою місце.', 'good'); }
-      else say(s, 'Ти повернув' + g(s, 'ся', 'лася') + ' з війська.', 'good');
+      if (A2.job && JOB[A2.job.id]) { s.job = A2.job; say(s, 'Ти поверну' + g(s, 'вся', 'лася') + ' з війська. Роботодавець зберіг за тобою місце.', 'good'); }
+      else say(s, 'Ти поверну' + g(s, 'вся', 'лася') + ' з війська.', 'good');
       if (s.flags.ptsd) say(s, 'Війна не відпускає: погано спиш, різкі звуки лякають. Допомогла б терапія.', 'bad');
     }
     return;
@@ -152,7 +152,7 @@ function mobilPrompt2(s, why) { var p = mobilPrompt(s); p.text = why + ' ' + p.t
 evOver('soldier_deploy', [18, 50], 3, function (s) { return s.job && s.job.id === 'soldier'; }, function (s) {
   var war = cf(s) === 2;
   return { text: war ? 'Твій підрозділ перекидають на передову.' : 'Пропонують місію за кордоном: подвійна оплата, пів року далеко від дому.', opts: [
-    O(war ? 'Виконувати наказ' : 'Поїхати', function () { if (!s.job) return 'Вже неактуально.'; s.job.perf += 12; s.money += M(s) * (war ? 0.8 : 0.5); add(s, { happy: -6 }); if (chance(war ? 0.05 : 0.01)) { die(s, war ? 'загинув' + g(s, '', 'ла') + ' на фронті' : 'загинув' + g(s, '', 'ла') + ' на місії'); return null; } if (chance(war ? 0.2 : 0.05)) { add(s, { health: -20 }); return 'Повернув' + g(s, 'ся', 'лася') + ' з пораненням.'; } return 'Ти повернув' + g(s, 'ся', 'лася') + ' цілим' + g(s, '', 'ою') + '. Командування помітило.'; }),
+    O(war ? 'Виконувати наказ' : 'Поїхати', function () { if (!s.job) return 'Вже неактуально.'; s.job.perf += 12; s.money += M(s) * (war ? 0.8 : 0.5); add(s, { happy: -6 }); if (chance(war ? 0.05 : 0.01)) { die(s, war ? 'загину' + g(s, 'в', 'ла') + ' на фронті' : 'загину' + g(s, 'в', 'ла') + ' на місії'); return null; } if (chance(war ? 0.2 : 0.05)) { add(s, { health: -20 }); return 'Поверну' + g(s, 'вся', 'лася') + ' з пораненням.'; } return 'Ти поверну' + g(s, 'вся', 'лася') + ' цілим' + g(s, '', 'ою') + '. Командування помітило.'; }),
     O('Подати рапорт на інше місце', function () { if (s.job) s.job.perf -= 10; if (war && chance(0.5)) return 'Рапорт відхилили. Наказ є наказ.'; return 'Тебе лишили на місці. Карʼєрі це не допомогло.'; })] };
 });
 
@@ -190,7 +190,7 @@ evOver('tutor', [14, 17], 2, function (s) { return s.q >= 3 && s.study && s.stud
   var poorF = s.d <= 5;
   return { text: 'Батьки пропонують найняти репетитора перед вступом.' + (poorF ? ' Для цього їм доведеться відмовитися від відпустки й економити.' : ''), opts: [
     O('Погодитися', function () { add(s, { gpa: 10, smarts: 2, happy: -3, social: -2 }); if (poorF) s.parents.forEach(function (p) { p.rel += 3; }); return 'Вечори з репетитором підтягнули бал, на друзів часу не лишилося.'; }),
-    O('Готуватися сам' + g(s, '', 'ою'), function () { if (chance(0.3 + s.st.smarts / 200)) { add(s, { gpa: 6, smarts: 3 }); return 'Сам' + g(s, '', 'а') + ' розібрав' + g(s, 'ся', 'лася') + ' — і це дало навіть більше.'; } add(s, { gpa: 1 }); return 'Самостійно вийшло так собі.'; })] };
+    O('Готуватися сам' + g(s, '', 'ою'), function () { if (chance(0.3 + s.st.smarts / 200)) { add(s, { gpa: 6, smarts: 3 }); return 'Сам' + g(s, '', 'а') + ' розібра' + g(s, 'вся', 'лася') + ' — і це дало навіть більше.'; } add(s, { gpa: 1 }); return 'Самостійно вийшло так собі.'; })] };
 }, true);
 
 // ======================================================================
@@ -270,14 +270,14 @@ function epitaph(s) {
   if (s.gang && s.gang.rank === 4) who = s.gang.kind === 'картель' ? 'глава картелю' : 'дон';
   bits.push(c.flag + ' ' + c.name + ', ' + s.birthYear + '–' + s.year + '. ' + cap(who) + '.');
   var t = [];
-  if (s.countries.length > 1) t.push(s.countries.length === 2 ? g(s, 'емігрував', 'емігрувала') + ' до ' + COUNTRIES[s.countries[1]].name : 'жив' + g(s, '', 'ла') + ' у ' + s.countries.length + ' країнах');
-  if (s.marriages > 1) t.push('мав' + g(s, '', 'ла') + ' ' + s.marriages + ' шлюби'); else if (s.marriages === 1) t.push(s.partner && s.partner.married && s.partner.yrs >= 25 ? 'прожив' + g(s, '', 'ла') + ' у шлюбі ' + s.partner.yrs + ' р.' : g(s, 'одружився', 'вийшла заміж'));
-  if (s.kids.length) t.push('виховав' + g(s, '', 'ла') + ' ' + s.kids.length + ' ' + (s.kids.length === 1 ? 'дитину' : s.kids.length < 5 ? 'дітей' : 'дітей'));
+  if (s.countries.length > 1) t.push(s.countries.length === 2 ? g(s, 'емігрував', 'емігрувала') + ' до ' + COUNTRIES[s.countries[1]].name : 'жи' + g(s, 'в', 'ла') + ' у ' + s.countries.length + ' країнах');
+  if (s.marriages > 1) t.push('ма' + g(s, 'в', 'ла') + ' ' + s.marriages + ' шлюби'); else if (s.marriages === 1) t.push(s.partner && s.partner.married && s.partner.yrs >= 25 ? 'прожи' + g(s, 'в', 'ла') + ' у шлюбі ' + s.partner.yrs + ' р.' : g(s, 'одружився', 'вийшла заміж'));
+  if (s.kids.length) t.push('вихова' + g(s, 'в', 'ла') + ' ' + s.kids.length + ' ' + (s.kids.length === 1 ? 'дитину' : s.kids.length < 5 ? 'дітей' : 'дітей'));
   if (s.flags.veteran) t.push('пройш' + g(s, 'ов', 'ла') + ' війну');
-  if (s.record) t.push('сидів' + g(s, '', 'ла') + ' у вʼязниці');
+  if (s.record) t.push('сиді' + g(s, 'в', 'ла') + ' у вʼязниці');
   if (t.length) bits.push(cap(t.slice(0, 3).join(', ')) + '.');
   var pk = globalPct(s.stat.peakInc);
-  bits.push(pk >= 99 ? 'На піку заробляв' + g(s, '', 'ла') + ' більше, ніж 99% людей на Землі.' : pk >= 80 ? 'Жив' + g(s, '', 'ла') + ' заможніше за більшість людей світу.' : pk >= 40 ? 'Жив' + g(s, '', 'ла') + ' як звичайна людина свого часу.' : 'Усе життя рахував' + g(s, '', 'ла') + ' кожну копійку.');
+  bits.push(pk >= 99 ? 'На піку заробля' + g(s, 'в', 'ла') + ' більше, ніж 99% людей на Землі.' : pk >= 80 ? 'Жи' + g(s, 'в', 'ла') + ' заможніше за більшість людей світу.' : pk >= 40 ? 'Жи' + g(s, 'в', 'ла') + ' як звичайна людина свого часу.' : 'Усе життя рахува' + g(s, 'в', 'ла') + ' кожну копійку.');
   return bits.join(' ');
 }
 function cap(x) { return x ? x.charAt(0).toUpperCase() + x.slice(1) : x; }

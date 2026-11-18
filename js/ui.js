@@ -50,9 +50,11 @@
     var body = '<p>' + esc(p.text || '') + '</p>';
     modal(p.title || 'Подія', body, p.opts.map(function (o) {
       return { t: o.t, sub: o.sub, dis: o.dis, f: function () {
+        if (!S._snap) S._snap = snapOf(S);
         var r = o.f(); normMoney(S);
         if (r && typeof r === 'object') { prompt(r, done, closable); return; }
         if (r) { say(S, r, 'me'); toast(r); }
+        S._snap = null;
         closeModal(); render(); save(); if (done) done();
       } };
     }), !!closable);
@@ -99,7 +101,7 @@
     }
     requestAnimationFrame(drawDots);
   }
-  function born(o) { setSpeed(0); S = newLife(o); Q = []; tab = 'sched'; save(); show('game'); render(); birthCard(); }
+  function born(o) { setSpeed(0); o = o || {}; S = (o.country || o.d) ? newLife(o) : newLifeSeeded(o, o.seed); Q = []; tab = 'sched'; save(); show('game'); render(); birthCard(); }
   function birthCard() {
     var c = COUNTRIES[S.birth], p = birthOdds(S.birth);
     var body = '<div class="big-flag">' + c.flag + '</div>' +
@@ -161,9 +163,11 @@
     var el = $('log'), html = '';
     S.log.forEach(function (e) {
       html += '<div class="yr' + (e.lines.length ? '' : ' empty') + '"><div class="age">' + e.age + '<small>' + e.year + '</small></div><div>' +
-        (e.lines.length ? e.lines.map(function (l) { return '<p class="' + l.k + '">' + esc(l.t) + '</p>'; }).join('') : '<p>Тихий рік.</p>') + '</div></div>';
+        (e.lines.length ? e.lines.map(function (l) { return l.d ? '<p class="' + l.k + ' has-d" tabindex="0">' + esc(l.t) + '<span class="fx">' + l.d.map(function (x) { var v = x[2] ? (x[1] > 0 ? '+' : '−') + cur(fmt(Math.abs(x[1]))) : (x[1] > 0 ? '+' : '−') + Math.abs(x[1]); return '<i class="' + (x[1] > 0 ? 'up' : 'dn') + '">' + x[0] + ' ' + v + '</i>'; }).join('') + '</span></p>' : '<p class="' + l.k + '">' + esc(l.t) + '</p>'; }).join('') : '<p>Тихий рік.</p>') + '</div></div>';
     });
     el.innerHTML = html; el.scrollTop = el.scrollHeight;
+    el.onclick = function (ev) { var p = ev.target.closest('.has-d'); if (p) p.classList.toggle('open'); };
+    el.onkeydown = function (ev) { if (ev.key === 'Enter' && ev.target.classList.contains('has-d')) ev.target.classList.toggle('open'); };
   }
   function renderTabs() {
     $('tabs').innerHTML = GROUPS.map(function (t) {
@@ -270,10 +274,11 @@
     if (!anyA) box.innerHTML = '<div class="none">' + (S.age < 5 ? 'Ти ще зовсім маленьк' + g(S, 'ий', 'а') + '. Просто живи.' : 'Зараз тут нічого не доступно.') + '</div>';
   }
   function act(a) {
+    S._snap = snapOf(S);
     var r = doAction(S, a);
-    if (r == null) return;
+    if (r == null) { S._snap = null; return; }
     if (typeof r === 'object') { prompt(r, function () { if (!S.alive) finish(); }, true); render(); return; }
-    say(S, r, 'me'); toast(r); render(); save();
+    say(S, r, 'me'); S._snap = null; toast(r); render(); save();
     if (!S.alive) finish();
   }
   function kv(k, v) { return '<div class="kv"><span>' + k + '</span><span>' + v + '</span></div>'; }
@@ -318,7 +323,7 @@
     if (S.kids.length) h += '<div class="ppl">Діти:</div>' + S.kids.map(function (k) { return '<div class="ppl"><span class="' + (k.alive ? '' : 'dead') + '">' + esc(k.name) + ', ' + k.age + '</span> · стосунки ' + Math.round(k.rel) + '<br><small class="note">' + [k.job ? esc(k.job) : '', k.uni ? 'університет' : '', k.talent && k.talent.indexOf('_lost') < 0 ? 'талант' : '', k.rebel ? 'бунтар' : '', k.abroad ? 'живе: ' + COUNTRIES[k.abroad].name : '', k.married ? 'одружен' + gp(k, 'ий', 'а') : ''].filter(Boolean).join(' · ') + '</small></div>'; }).join('');
     if (S.grandkids) h += '<div class="ppl">Онуків: ' + S.grandkids + '</div>';
     h += '<div class="ppl">Друзів: ' + S.friends + '</div>';
-    h += '<h3>Країна</h3>' + kv('Де живеш', c.flag + ' ' + c.name) + (S.crisis ? kv('Зараз', crisisName(S) + ' · ще ~' + S.crisis.t + ' р.') : '') + (S.army ? kv('Служба', (S.army.front ? 'фронт' : 'тил') + ' · ще ~' + S.army.left + ' р.') : '') + kv('Громадянство', (S.citizen || [S.birth]).map(function (x) { return COUNTRIES[x].flag + ' ' + COUNTRIES[x].name; }).join(', ')) + (isCitizen(S) ? '' : kv('Статус тут', STATUS_N[resStatus(S)]) + kv('До громадянства', (function () { var r = natRule(S.country); return r.cit >= 99 ? 'практично неможливо' : (resStatus(S) === 'pr' ? 'ще ' + Math.max(0, r.cit - S.immYrs) + ' р. + мова ' + r.lang : 'спершу постійне проживання (через ' + Math.max(0, r.pr - S.immYrs) + ' р.)'); })())) + rulesHTML(c) + kv('Тривалість життя', c.le + ' р.') + kv('Економіка', S.econ < 0 ? 'криза' : S.econ > 0 ? 'підйом' : 'стабільна') + (cf(S) ? kv('Безпека', cf(S) === 2 ? 'війна' : 'напружено') : '') + (S.immigrant ? kv('Адаптація', yrs(S.immYrs)) : '');
+    h += (S.dream ? '<h3>Мрія</h3>' + kv(DREAMS[S.dream].n, DREAMS[S.dream].d) : '') + '<h3>Країна</h3>' + kv('Де живеш', c.flag + ' ' + c.name) + kv('Ціни', priceWord(c.code) + ' (' + Math.round(priceLvl(c.code) * 100) + '% від США)') + (S.seed ? kv('Код народження', S.seed) : '') + (S.job && S.job.remote ? kv('Робота', 'віддалено на іноземну компанію') : '') + (S.support ? kv('Аліменти', Math.round(S.support.pct * 100) + '% доходу ще ' + (S.support.until - S.age) + ' р.') : '') + (S.crisis ? kv('Зараз', crisisName(S) + ' · ще ~' + S.crisis.t + ' р.') : '') + (S.army ? kv('Служба', (S.army.front ? 'фронт' : 'тил') + ' · ще ~' + S.army.left + ' р.') : '') + kv('Громадянство', (S.citizen || [S.birth]).map(function (x) { return COUNTRIES[x].flag + ' ' + COUNTRIES[x].name; }).join(', ')) + (isCitizen(S) ? '' : kv('Статус тут', STATUS_N[resStatus(S)]) + kv('До громадянства', (function () { var r = natRule(S.country); return r.cit >= 99 ? 'практично неможливо' : (resStatus(S) === 'pr' ? 'ще ' + Math.max(0, r.cit - S.immYrs) + ' р. + мова ' + r.lang : 'спершу постійне проживання (через ' + Math.max(0, r.pr - S.immYrs) + ' р.)'); })())) + rulesHTML(c) + kv('Тривалість життя', c.le + ' р.') + kv('Економіка', S.econ < 0 ? 'криза' : S.econ > 0 ? 'підйом' : 'стабільна') + (cf(S) ? kv('Безпека', cf(S) === 2 ? 'війна' : 'напружено') : '') + (S.immigrant ? kv('Адаптація', yrs(S.immYrs)) : '');
     $('profile').innerHTML = cur(h);
   }
 
@@ -352,7 +357,7 @@
     var graves = store(GKEY) || [];
     if (!S._buried) {
       S._buried = 1;
-      graves.unshift({ left: !!S.left, n: S.first + ' ' + S.last, f: c.flag, c: c.name, a: S.age, cause: S.cause, job: S.jobHist.concat(S.job ? [S.job] : []).filter(function (j) { return JOB[j.id]; }).map(function (j) { return JOB[j.id].n; }).pop() || '', net: sm.net, peakNet: sm.peakNet, pk: sm.peakPct, d: S.d, emig: S.countries.length > 1, code: c.code, ach: sm.ach.map(function (a) { return a.id; }), t: Date.now() });
+      graves.unshift({ left: !!S.left, n: S.first + ' ' + S.last, f: c.flag, c: c.name, a: S.age, cause: S.cause, job: S.jobHist.concat(S.job ? [S.job] : []).filter(function (j) { return JOB[j.id]; }).map(function (j) { return JOB[j.id].n; }).pop() || '', net: sm.net, peakNet: sm.peakNet, pk: sm.peakPct, d: S.d, d2: S.age >= 25 ? lifeDecile(S) : null, seed: S.seed, dream: (S.dreamsDone || []).length, emig: S.countries.length > 1, code: c.code, ach: sm.ach.map(function (a) { return a.id; }), t: Date.now() });
       store(GKEY, graves.slice(0, 200));
     }
     var careers = S.jobHist.concat(S.job ? [S.job] : []).filter(function (j) { return JOB[j.id]; });
@@ -365,9 +370,14 @@
       st(fmt(sm.peakNet), 'найбільший статок') +
       (S.left ? '' : st((S.age >= c.le ? '+' : '') + Math.round(S.age - c.le) + ' р.', 'проти середньої тривалості життя в ' + c.name + ' (' + c.le + ' р.)')) +
       (sm.peakInc > 0 ? st('×' + (sm.peakInc / c.median).toFixed(1).replace('.', ','), 'від медіанного доходу країни — твій найкращий рік') : '') + '</div>' +
-      '<p class="epi">' + esc(epitaph(S)) + '</p>';
+      '<p class="epi">' + esc(epitaph(S)) + '</p>' +
+      (S.age >= 25 ? '<p class="mob">' + esc(mobilityText(S, lifeDecile(S))) + '</p>' : '') +
+      '<div class="kv"><span>Мрія</span><span>' + ((S.dreamsDone || []).length ? 'здійснено: ' + S.dreamsDone.map(function (k) { return DREAMS[k].n.toLowerCase(); }).join(', ') + (S.dream ? ' · не встиг' + g(S, '', 'ла') + ': ' + DREAMS[S.dream].n.toLowerCase() : '') : S.dream ? 'не здійснилася — ' + DREAMS[S.dream].n.toLowerCase() : 'не ма' + g(S, 'в', 'ла')) + '</span></div>' +
+      (S.age >= 45 ? '<div class="kv"><span>Заповіт</span><span>' + (S.will ? esc(S.will.n) : 'не було — спадщину ділили за законом') + '</span></div>' : '') +
+      (S.seed ? '<div class="kv"><span>Код народження</span><span><b>' + S.seed + '</b> — дай другу, щоб він почав з того самого старту</span></div>' : '') +
+      (function () { var gs = (store(GKEY) || []).slice(1), rec = []; if (!gs.length) return ''; if (!S.left && S.age > Math.max.apply(null, gs.filter(function (x) { return !x.left; }).map(function (x) { return x.a; }).concat([0]))) rec.push('найдовше життя'); if (sm.peakNet > Math.max.apply(null, gs.map(function (x) { return x.peakNet || x.net || 0; }))) rec.push('найбільший статок'); var dd = S.age >= 25 ? lifeDecile(S) - S.d : null, ups = gs.filter(function (x) { return x.d2 != null; }).map(function (x) { return x.d2 - x.d; }); if (dd != null && dd > 0 && dd > Math.max.apply(null, ups.concat([0]))) rec.push('найбільший підйом'); return rec.length ? '<p class="rec">🏆 Новий рекорд серед твоїх життів: ' + rec.join(', ') + '</p>' : ''; })();
     h += '<h2>Життя</h2><div class="kv"><span>Освіта</span><span>' + EDU_NAMES[S.edu] + (S.fields.length ? ' · ' + S.fields.map(fieldName).join(', ') : '') + '</span></div>' +
-      '<div class="kv"><span>Карʼєра</span><span>' + (careers.length ? careers.map(function (j) { var J = JOB[j.id]; return J.n + (J.max ? ' (' + lvName(J, j.lvl).toLowerCase() + ')' : ''); }).join(' → ') : 'не працював' + g(S, '', 'ла') + ' офіційно') + '</span></div>' +
+      '<div class="kv"><span>Карʼєра</span><span>' + (careers.length ? careers.map(function (j) { var J = JOB[j.id]; return J.n + (J.max ? ' (' + lvName(J, j.lvl).toLowerCase() + ')' : ''); }).join(' → ') : 'не працюва' + g(S, 'в', 'ла') + ' офіційно') + '</span></div>' +
       '<div class="kv"><span>Бізнеси</span><span>' + (S.bizHist.length + S.biz.length ? S.bizHist.map(function (b) { return b.name + ' (' + yrs(b.yrs) + ', ' + b.how + ')'; }).concat(S.biz.map(function (b) { return b.name + ' (' + yrs(b.yrs) + ', до кінця)'; })).join('; ') : '—') + '</span></div>' +
       '<div class="kv"><span>Країни</span><span>' + S.countries.map(function (x) { return COUNTRIES[x].flag + ' ' + COUNTRIES[x].name; }).join(' → ') + '</span></div>' +
       '<div class="kv"><span>Громадянство</span><span>' + (S.citizen || [S.birth]).map(function (x) { return COUNTRIES[x].flag + ' ' + COUNTRIES[x].name; }).join(', ') + '</span></div>' +
@@ -413,6 +423,7 @@
       '<div class="kv"><span>Найдовше</span><span>' + longest.f + ' ' + esc(longest.n) + ', ' + longest.a + '</span></div>' +
       '<div class="kv"><span>Найкоротше</span><span>' + shortest.f + ' ' + esc(shortest.n) + ', ' + shortest.a + '</span></div>' +
       '<div class="kv"><span>Найбагатше</span><span>' + richest.f + ' ' + esc(richest.n) + ', ' + fmt(richest.peakNet || richest.net || 0) + '</span></div>' +
+      (function () { var up = gs.filter(function (x) { return x.d2 != null; }); if (!up.length) return ''; var b = up.reduce(function (a, x) { return x.d2 - x.d > a.d2 - a.d ? x : a; }); var w = up.reduce(function (a, x) { return x.d2 - x.d < a.d2 - a.d ? x : a; }); var dr = gs.filter(function (x) { return x.dream; }).length; return '<div class="kv"><span>Найбільший підйом</span><span>' + b.f + ' ' + esc(b.n) + ': ' + b.d + '-й → ' + b.d2 + '-й дециль</span></div><div class="kv"><span>Найбільше падіння</span><span>' + w.f + ' ' + esc(w.n) + ': ' + w.d + '-й → ' + w.d2 + '-й дециль</span></div><div class="kv"><span>Здійснили мрію</span><span>' + dr + ' з ' + n + '</span></div>'; })() +
       '<h3 class="mh">Досягнення за всі життя</h3><div class="ach">' + ACHIEVEMENTS.map(function (a) { var k = achN[a.id] || 0; return '<span class="' + (k ? '' : 'off') + '" title="' + esc(a.d) + '">' + esc(a.n) + (k ? ' ×' + k : '') + '</span>'; }).join('') + '</div>';
     modal('Статистика всіх життів', body, [{ t: 'Список життів', f: gravesModal }, { t: 'Назад', f: closeModal }]);
   }
@@ -441,6 +452,12 @@
   // ---------- Події кнопок ----------
   $('btnBorn').onclick = function () { born({}); };
   $('btnSandbox').onclick = sandbox;
+  $('btnSeed').onclick = function () {
+    modal('Народитися за кодом', '<p>Введи код, яким з тобою поділилися, — і почнеш з того самого старту: та сама країна, родина, гени. Далі все залежить від твоїх рішень.</p><input id="seedIn" class="seed-in" maxlength="10" placeholder="Напр. K7Q2XM" autocomplete="off">', [
+      { t: 'Народитися', f: function () { var v = ($('seedIn').value || '').trim(); if (!v) return; closeModal(); born({ seed: v }); } },
+      { t: 'Скасувати', f: closeModal }], true);
+    setTimeout(function () { var i = $('seedIn'); if (i) i.focus(); }, 30);
+  };
   $('btnGraves').onclick = statsModal;
   $('btnHub').onclick = toHub;
   $('btnYear').onclick = function () { acc = 0; nextYear(1); };

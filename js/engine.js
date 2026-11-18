@@ -318,8 +318,8 @@ function openBiz(s, type, pm, loc) {
   if (s.money < cost) { loan = cost - s.money; addDebt(s, loan, 'кредит на бізнес'); s.money = 0; s.loans = (s.loans || 0) + 1; } else s.money -= cost;
   var b = { loc: loc || 0, share: 1, staff: 0, points: 1, type: type, cap: cost * 0.8, cash: cost * 0.2, yrs: 0, effort: s.job ? 0.5 : 1, mgr: false, div: 0.5, paid: 0, comp: 0, last: 0, hist: [], start: s.age, name: T.n };
   s.biz.push(b);
-  mark(s, 'Відкрив' + g(s, '', 'ла') + ' бізнес: ' + T.n);
-  return 'Ти відкрив' + g(s, '', 'ла') + ' «' + T.n + '». Вкладено ' + fmt(cost) + (loan ? ', з них ' + fmt(loan) + ' у кредит' : '') + '.';
+  mark(s, 'Відкри' + g(s, 'в', 'ла') + ' бізнес: ' + T.n);
+  return 'Ти відкри' + g(s, 'в', 'ла') + ' «' + T.n + '». Вкладено ' + fmt(cost) + (loan ? ', з них ' + fmt(loan) + ' у кредит' : '') + '.';
 }
 function bizValue(s, b) {
   var avg = b.hist.length ? b.hist.slice(-3).reduce(function (a, x) { return a + x; }, 0) / Math.min(3, b.hist.length) : 0;
@@ -364,7 +364,7 @@ function bizTick(s, out) {
     if (T.startup && b.yrs >= 2 && q > 50 && chance(0.004 + (q - 50) / 4000)) {
       var v = b.cap * (q > 75 && chance(0.01) ? rnd(50, 400) : rnd(3, 15)) * (b.share || 1);
       say(s, 'Твій «' + b.name + '» купила велика компанія за ' + fmt(v) + '!', 'big');
-      mark(s, 'Продав' + g(s, '', 'ла') + ' стартап за ' + fmt(v));
+      mark(s, 'Прода' + g(s, 'в', 'ла') + ' стартап за ' + fmt(v));
       closeBiz(s, b, 'куплено інвестором', v);
       return;
     }
@@ -378,9 +378,9 @@ function bizCrisis(s, b) {
   return {
     title: 'Бізнес у мінусі', text: '«' + b.name + '» не покриває витрат: потрібно ' + fmt(need) + ', щоб розрахуватися з постачальниками й працівниками. Підготовка: ' + bizReadyLabel(bizQ(s, b)) + '.',
     opts: [
-      { t: 'Докласти ' + fmt(need), sub: s.money >= need ? 'з власних заощаджень' : canBorrow(s) ? 'бракує ' + fmt(need - s.money) + ' — візьмеш кредит' : 'бракує грошей, а банк не дає кредит (рейтинг ' + Math.round(s.credit) + ')', dis: s.money < need && !canBorrow(s), f: function () { if (s.money >= need) s.money -= need; else { addDebt(s, need - s.money, 'порятунок бізнесу'); s.money = 0; } b.cash += need; return 'Ти врятував' + g(s, '', 'ла') + ' «' + b.name + '», доклавши ' + fmt(need) + '.'; } },
-      { t: 'Скоротити витрати і працювати самому', sub: 'частина клієнтів піде', f: function () { b.cash += b.cap * 0.15; b.cap *= 0.75; b.effort = 1; b.mgr = false; add(s, { happy: -6, health: -3 }); return 'Ти урізав' + g(s, '', 'ла') + ' витрати. Бізнес менший, але живий.'; } },
-      { t: 'Закрити бізнес', sub: 'продаж майна покриє частину боргів', f: function () { var v = b.cap * 0.25 + b.cash; closeBiz(s, b, 'закрито', v); add(s, { happy: -10 }); return 'Ти закрив' + g(s, '', 'ла') + ' «' + b.name + '» після ' + b.yrs + ' р. ' + (v >= 0 ? 'Після розпродажу лишилося ' + fmt(v) + '.' : 'Залишився борг ' + fmt(-v) + '.'); } }
+      { t: 'Докласти ' + fmt(need), sub: s.money >= need ? 'з власних заощаджень' : canBorrow(s) ? 'бракує ' + fmt(need - s.money) + ' — візьмеш кредит' : 'бракує грошей, а банк не дає кредит (рейтинг ' + Math.round(s.credit) + ')', dis: s.money < need && !canBorrow(s), f: function () { if (s.money >= need) s.money -= need; else { addDebt(s, need - s.money, 'порятунок бізнесу'); s.money = 0; } b.cash += need; return 'Ти врятува' + g(s, 'в', 'ла') + ' «' + b.name + '», доклавши ' + fmt(need) + '.'; } },
+      { t: 'Скоротити витрати і працювати самому', sub: 'частина клієнтів піде', f: function () { b.cash += b.cap * 0.15; b.cap *= 0.75; b.effort = 1; b.mgr = false; add(s, { happy: -6, health: -3 }); return 'Ти уріза' + g(s, 'в', 'ла') + ' витрати. Бізнес менший, але живий.'; } },
+      { t: 'Закрити бізнес', sub: 'продаж майна покриє частину боргів', f: function () { var v = b.cap * 0.25 + b.cash; closeBiz(s, b, 'закрито', v); add(s, { happy: -10 }); return 'Ти закри' + g(s, 'в', 'ла') + ' «' + b.name + '» після ' + b.yrs + ' р. ' + (v >= 0 ? 'Після розпродажу лишилося ' + fmt(v) + '.' : 'Залишився борг ' + fmt(-v) + '.'); } }
     ]
   };
 }
@@ -435,7 +435,7 @@ function uniOpts(s, kind, shorter) {
 }
 function vocOpts(s, years) {
   return Object.keys(VOC_FIELDS).map(function (f) {
-    return { t: VOC_FIELDS[f].n, sub: years + ' р. навчання', f: function () { startStudy(s, 'voc', f, years); mark(s, 'Коледж: ' + VOC_FIELDS[f].n); return 'Ти вступив' + g(s, '', 'ла') + ' до коледжу: ' + VOC_FIELDS[f].n + '.'; } };
+    return { t: VOC_FIELDS[f].n, sub: years + ' р. навчання', f: function () { startStudy(s, 'voc', f, years); mark(s, 'Коледж: ' + VOC_FIELDS[f].n); return 'Ти вступи' + g(s, 'в', 'ла') + ' до коледжу: ' + VOC_FIELDS[f].n + '.'; } };
   });
 }
 function after9(s) {
@@ -444,7 +444,7 @@ function after9(s) {
     opts: [
       { t: 'Старша школа', sub: '2 роки, потім університет', f: function () { s.study = { t: 'school', st: 'upper', left: 2 }; return 'Ти ' + g(s, 'пішов', 'пішла') + ' у 10 клас.'; } },
       { t: 'Коледж', sub: 'робоча професія за 3 роки', f: function () { return { title: 'Який коледж?', text: 'Обери напрям.', opts: vocOpts(s, 3) }; } },
-      { t: 'Піти працювати', sub: 'гроші вже зараз', f: function () { add(s, { happy: 2 }); return 'Ти вирішив' + g(s, '', 'ла') + ', що навчання досить.'; } }
+      { t: 'Піти працювати', sub: 'гроші вже зараз', f: function () { add(s, { happy: 2 }); return 'Ти виріши' + g(s, 'в', 'ла') + ', що навчання досить.'; } }
     ]
   };
 }
@@ -465,7 +465,7 @@ function eduTick(s, out) {
     var p = clamp(0.55 + c.sec * 0.45 + (s.q - 3) * 0.05 + (s.urban ? 0.05 : -0.05), 0.3, 0.99);
     if (cf(s) === 2) p -= 0.1;
     if (chance(p)) { s.study = { t: 'school', st: 'primary', left: 5 }; say(s, g(s, 'Ти пішов', 'Ти пішла') + ' до школи.'); }
-    else { s.noSchool = true; say(s, 'Родина не змогла віддати тебе до школи. Факт: ≈250 млн дітей у світі не ходять до школи (UNESCO, 2023).', 'bad'); mark(s, 'Не пішов' + g(s, '', 'ла') + ' до школи'); }
+    else { s.noSchool = true; say(s, 'Родина не змогла віддати тебе до школи. Факт: ≈250 млн дітей у світі не ходять до школи (UNESCO, 2023).', 'bad'); mark(s, 'Не піш' + g(s, 'ов', 'ла') + ' до школи'); }
     return;
   }
   var st = s.study; if (!st) return;
@@ -477,7 +477,7 @@ function eduTick(s, out) {
   st.left--;
   // вибування з бідних шкіл
   if (st.t === 'school' && s.age >= 10 && s.q <= 2 && c.gdp < 10 && chance(0.05 * (1 - c.sec))) {
-    s.study = null; say(s, 'Довелося кинути школу, щоб допомагати родині.', 'bad'); mark(s, 'Кинув' + g(s, '', 'ла') + ' школу'); return;
+    s.study = null; say(s, 'Довелося кинути школу, щоб допомагати родині.', 'bad'); mark(s, 'Кину' + g(s, 'в', 'ла') + ' школу'); return;
   }
   if (st.left > 0) return;
   s.study = null;
@@ -488,7 +488,7 @@ function eduTick(s, out) {
       if (chance(p2)) s.study = { t: 'school', st: 'lower', left: 4 };
       else { say(s, 'Початкову школу закінчено, але далі вчитися родина не може.', 'bad'); }
     } else if (st.st === 'lower') { s.edu = Math.max(s.edu, 2); out.push(after9(s)); }
-    else { s.edu = Math.max(s.edu, 3); mark(s, 'Закінчив' + g(s, '', 'ла') + ' школу'); out.push(after11(s)); }
+    else { s.edu = Math.max(s.edu, 3); mark(s, 'Закінчи' + g(s, 'в', 'ла') + ' школу'); out.push(after11(s)); }
   } else if (st.t === 'voc') {
     s.edu = Math.max(s.edu, 4); if (s.vfields.indexOf(st.f) < 0) s.vfields.push(st.f); mark(s, 'Диплом коледжу'); add(s, { craft: st.f === 'tech' ? 25 : 5, cook: st.f === 'cook' ? 25 : 0, code: st.f === 'itv' ? 20 : 0, art: st.f === 'beauty' ? 15 : 0 });
     say(s, 'Ти ' + g(s, 'отримав', 'отримала') + ' диплом коледжу: ' + fieldName(st.f) + '.', 'good');
@@ -513,7 +513,7 @@ function eduTick(s, out) {
       { t: 'Йти в науку', sub: 'шанс ' + Math.round(pp * 100) + '% · 4 роки', f: function () { if (chance(pp)) { startStudy(s, 'phd', st.f, 4); return 'Ти ' + g(s, 'став', 'стала') + ' аспірантом.'; } return 'Місць в аспірантурі не вистачило.'; } },
       { t: 'Ні, в індустрію', f: function () { return 'Наука почекає.'; } }] });
   } else if (st.t === 'phd') {
-    s.edu = 7; mark(s, 'Захистив' + g(s, '', 'ла') + ' дисертацію'); say(s, 'Ти ' + g(s, 'захистив', 'захистила') + ' дисертацію. Тепер ти доктор наук.', 'big'); add(s, { happy: 10, smarts: 5 });
+    s.edu = 7; mark(s, 'Захисти' + g(s, 'в', 'ла') + ' дисертацію'); say(s, 'Ти ' + g(s, 'захистив', 'захистила') + ' дисертацію. Тепер ти доктор наук.', 'big'); add(s, { happy: 10, smarts: 5 });
   }
 }
 
@@ -575,9 +575,8 @@ function familyTick(s) {
       say(s, (p.married ? gp(p, 'Помер твій чоловік', 'Померла твоя дружина') : gp(p, 'Помер твій партнер', 'Померла твоя партнерка')) + ' ' + p.name + '.', 'bad');
       mark(s, 'Втрата: ' + p.name);
     } else if (p.rel < 22 && chance(0.4)) {
-      s.partner = null; s.exes++; add(s, { happy: -14 });
-      if (p.married) { var loss = Math.max(0, s.money) * 0.35; s.money -= loss; say(s, 'Ви з ' + p.name + ' розлучилися. Розподіл майна коштував ' + fmt(loss) + '.', 'bad'); mark(s, 'Розлучення'); }
-      else say(s, p.name + ' пішл' + gp(p, 'ов', 'а') + ' від тебе.', 'bad');
+      if (p.married) s.pendDivorce = p;
+      else { s.partner = null; s.exes++; add(s, { happy: -14 }); say(s, p.name + ' піш' + gp(p, 'ов', 'ла') + ' від тебе.', 'bad'); }
     }
   }
   s.kids.forEach(function (k) {
@@ -589,7 +588,7 @@ function familyTick(s) {
       // майбутнє дитини залежить від твого доходу, освіти й часу, який ти їй давав
       var kp = clamp(0.15 + C(s).sec * 0.35 + (wealthQ(s) - 3) * 0.08 + (s.edu >= 5 ? 0.12 : 0) + (k.rel - 50) / 200 + (k.edu ? 0.15 : 0), 0.03, 0.95);
       k.uni = chance(kp);
-      say(s, gp(k, 'Син', 'Донька') + ' ' + k.name + ' виріс' + gp(k, '', 'ла') + (k.uni ? ' і вступи' + gp(k, 'в', 'ла') + ' до університету.' : ' і пішов' + gp(k, '', 'ла') + ' працювати після школи.') + (k.rel < 35 ? ' Спілкуєтесь ви рідко.' : ''), k.uni ? 'good' : '');
+      say(s, gp(k, 'Син', 'Донька') + ' ' + k.name + ' виріс' + gp(k, '', 'ла') + (k.uni ? ' і вступи' + gp(k, 'в', 'ла') + ' до університету.' : ' і піш' + gp(k, 'ов', 'ла') + ' працювати після школи.') + (k.rel < 35 ? ' Спілкуєтесь ви рідко.' : ''), k.uni ? 'good' : '');
     }
     if (k.age >= 22 && chance(0.07)) { s.grandkids++; say(s, 'У ' + k.name + ' народилася дитина — у тебе ' + (s.grandkids === 1 ? 'перший онук!' : s.grandkids + '-й онук.'), 'good'); add(s, { happy: 6 }); if (s.grandkids === 1) mark(s, 'Перший онук'); }
   });
@@ -695,7 +694,7 @@ function jobTick(s) {
   add(s, { health: -(j.st - 50) / 40, happy: (j.sat - 50) / 25 });
   if (j.danger && chance(0.03)) { add(s, { health: -20 }); say(s, 'Травма на роботі.', 'bad'); }
   var lay = j.risk * (s.econ < 0 ? 2.5 : 1) * (s.job.perf < 35 ? 2.5 : 1) * 0.6;
-  if (chance(lay)) { say(s, 'Тебе звільнили з посади «' + j.n + '»' + (s.econ < 0 ? ' через кризу.' : '.'), 'bad'); add(s, { happy: -10 }); endJob(s, 'звільнили'); }
+  if (chance(lay)) { say(s, 'Тебе звільнили з посади «' + j.n + '». Причина: ' + whyFired(s, j) + '.', 'bad'); add(s, { happy: -10 }); endJob(s, 'звільнили'); }
   else if (j.age && s.age > j.age[1] + 3) { say(s, 'Час йти з професії «' + j.n + '» за віком.'); endJob(s, 'вік'); }
 }
 
@@ -815,6 +814,7 @@ function ageUp(s) {
   familyTick(s);
   careTick(s, out);
   armyTick(s, out);
+  life2Tick(s, out);
   if (!s.alive) return out;
   eduTick(s, out);
   jobTick(s);
@@ -854,8 +854,8 @@ function illnessPrompt(s) {
   var c = C(s), cost = treatCost(s) * rnd(0.7, 1.4);
   var name = s.flags.illName;
   return { title: 'Діагноз', text: 'Лікарі виявили: ' + name + '. Лікування коштуватиме ' + fmt(cost) + (c.health === 'free' ? ' (майже все покриває держава).' : c.health === 'paid' ? ' — медицина тут платна.' : '.') + ' Якість медицини: ' + Math.round(c.hq * 100) + '/100.', opts: [
-    { t: 'Лікуватися', sub: s.money >= cost ? 'оплатити зі збережень' : 'в борг', f: function () { if (s.money >= cost) s.money -= cost; else { addDebt(s, cost - s.money, 'лікування'); s.money = 0; } s.flags.illTreated = true; add(s, { happy: -5 }); return 'Ти почав' + g(s, '', 'ла') + ' лікування (' + name + ').'; } },
-    { t: 'Не лікуватися', sub: 'надто дорого', f: function () { add(s, { happy: -10 }); return 'Ти вирішив' + g(s, '', 'ла') + ' не лікуватися.'; } }
+    { t: 'Лікуватися', sub: s.money >= cost ? 'оплатити зі збережень' : 'в борг', f: function () { if (s.money >= cost) s.money -= cost; else { addDebt(s, cost - s.money, 'лікування'); s.money = 0; } s.flags.illTreated = true; add(s, { happy: -5 }); return 'Ти поча' + g(s, 'в', 'ла') + ' лікування (' + name + ').'; } },
+    { t: 'Не лікуватися', sub: 'надто дорого', f: function () { add(s, { happy: -10 }); return 'Ти виріши' + g(s, 'в', 'ла') + ' не лікуватися.'; } }
   ] };
 }
 function getIll(s, name) { if (s.flags.ill) return; s.flags.ill = true; s.flags.illName = name; s.flags.illKnown = false; s.flags.illTreated = false; }
@@ -917,7 +917,7 @@ function gangTick(s, out) {
   g2.perf = clamp(g2.perf * 0.5 + 25 + (s.st.smarts - 50) * 0.2 + s.sk.sport / 8 + (s.st.social - 50) * 0.2 + (s.used.job_gang ? 15 : 0) + rnd(-10, 10));
   g2.heat = (g2.heat || 0) + (s.used.job_gang ? 1 : 0.3) - (s.used.lowkey ? 1 : 0); if (g2.heat < 0) g2.heat = 0;
   s.gangWar = false;
-  if (chance(r.death)) { die(s, pick(['загинув' + g(s, '', 'ла') + ' у розборках', 'вбивство конкурентами', 'перестрілка з поліцією'])); return; }
+  if (chance(r.death)) { die(s, pick(['загину' + g(s, 'в', 'ла') + ' у розборках', 'вбивство конкурентами', 'перестрілка з поліцією'])); return; }
   if (chance(r.arrest)) {
     var cp = court(s, g2.rank >= 3 ? 'керівництво злочинною організацією' : 'участь в організованому угрупованні', 2 + g2.rank * 2, 4 + g2.rank * 4);
     if (typeof cp === 'object') { cp.title = 'Арешт'; out.push(cp); } else say(s, cp, 'bad');
@@ -972,7 +972,7 @@ function creditTick(s, out) {
   s.debtYrs = heavy ? (s.debtYrs || 0) + 1 : 0;
   if (s.debtYrs >= 2 && s.age >= 18 && !s.flags.bankrupt) out.push({ title: 'Борги душать', text: 'Борг ' + fmt(s.debt) + ' — це кілька твоїх річних доходів, і він росте через відсотки. Кредитний рейтинг: ' + Math.round(s.credit) + '.', opts: [
     { t: 'Оголосити банкрутство', sub: 'частину боргу спишуть, майно продадуть, 7 років без кредитів', f: function () { if (s.home) { s.debt -= s.home.val; s.home = null; } s.rentals = []; s.debt = Math.max(0, s.debt * 0.2); s.credit = 5; s.flags.bankrupt = 7; s.debtYrs = 0; mark(s, 'Банкрутство'); add(s, { happy: -8 }); return 'Банкрутство оголошено. Борг зменшено до ' + fmt(s.debt) + '.'; } },
-    { t: 'Платити далі', sub: 'стрес, але без мітки в історії', f: function () { add(s, { happy: -8, health: -3 }); s.debtYrs = 0; return 'Ти вирішив' + g(s, '', 'ла') + ' розплачуватися сам' + g(s, '', 'а') + '.'; } }] });
+    { t: 'Платити далі', sub: 'стрес, але без мітки в історії', f: function () { add(s, { happy: -8, health: -3 }); s.debtYrs = 0; return 'Ти виріши' + g(s, 'в', 'ла') + ' розплачуватися сам' + g(s, '', 'а') + '.'; } }] });
 }
 function mentalTick(s) {
   if (s.age < 13) return;
