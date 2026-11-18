@@ -242,8 +242,8 @@ function familyLuckTick(s, out) {
   // бідність заважає вчитися: немає репетиторів, книжок, тиші вдома, треба допомагати по господарству
   if (s.study && s.study.t === 'school' && d <= 3) s.gpa = clamp(s.gpa - (4 - d) * 0.8);
   if (s.study && s.study.t === 'school' && d >= 8 && !s.priv) s.gpa = clamp(s.gpa + 1);
-  // допомога батьків у 22–32
-  if (s.age >= 22 && s.age <= 32 && !s.parentGift && d >= 4 && parentsAlive(s) && !s.prison && chance(0.25)) {
+  // допомога батьків — лише до 25
+  if (s.age >= 18 && s.age <= 25 && !s.parentGift && d >= 4 && parentsAlive(s) && !s.prison && chance(0.25)) {
     s.parentGift = 1;
     var gift = c.median * [0, 0, 0, 0.3, 0.5, 0.8, 1.5, 3, 6, 15][d - 1] * (s.flags.elite ? 10 : 1) * rnd(0.7, 1.3);
     var o = [
