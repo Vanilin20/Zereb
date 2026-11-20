@@ -338,8 +338,8 @@ function bizTick(s, out) {
   s.biz.slice().forEach(function (b) {
     var T = BIZM[b.type], q = bizQ(s, b);
     var active = s.biz.filter(function (x) { return !x.mgr; }).length, eff = b.mgr ? b.effort : b.effort / Math.max(1, active);   // одна людина не може повністю тягнути кілька бізнесів
-    var roi = T.roi + (b.loc || 0) + (q - 35) / 200 - (b.yrs === 0 ? T.ramp : 0) + s.econ * T.cyc + gauss() * T.vol - b.comp;
-    if (s.econ > 0) roi = T.roi + (q - 35) / 200 - (b.yrs === 0 ? T.ramp : 0) + 0.04 + gauss() * T.vol - b.comp;
+    var roi = T.roi + (b.loc || 0) + (b.mom || 0) + (q - 35) / 200 - (b.yrs === 0 ? T.ramp : 0) + s.econ * T.cyc + gauss() * T.vol - b.comp;
+    if (s.econ > 0) roi = T.roi + (b.loc || 0) + (b.mom || 0) + (q - 35) / 200 - (b.yrs === 0 ? T.ramp : 0) + 0.04 + gauss() * T.vol - b.comp;
     b.comp *= 0.6;
     var sat = BIZM[b.type].cost * c.median * (BIZ_SCALE[b.type] || 20);
     if (b.cap > sat) roi -= 0.15 * Math.log2(b.cap / sat);   // ринок не безмежний
@@ -368,7 +368,13 @@ function bizTick(s, out) {
       closeBiz(s, b, 'куплено інвестором', v);
       return;
     }
-    say(s, '«' + b.name + '»: ' + (prof >= 0 ? 'прибуток ' : 'збиток ') + fmt(Math.abs(prof)) + ' за рік.', prof >= 0 ? 'good' : 'bad');
+    // у журнал — лише помітне: перший прибуток, зміна знаку, різкий стрибок, зміна етапу
+    var prevP = b.hist.length > 1 ? b.hist[b.hist.length - 2] : null, stg = typeof bizStage === 'function' ? bizStage(b) : '';
+    if (prevP === null) say(s, '«' + b.name + '»: перший рік — ' + (prof >= 0 ? 'прибуток ' : 'збиток ') + fmt(Math.abs(prof)) + (prof < 0 ? '. Для старту це нормально.' : '.'), prof >= 0 ? 'good' : '');
+    else if ((prevP < 0) !== (prof < 0)) say(s, '«' + b.name + '»: ' + (prof >= 0 ? 'вийшов у плюс — ' + fmt(prof) + ' за рік.' : 'пішов у мінус — ' + fmt(-prof) + ' збитку.'), prof >= 0 ? 'good' : 'bad');
+    else if (Math.abs(prof - prevP) > Math.max(Math.abs(prevP) * 0.6, c.median * 0.4)) say(s, '«' + b.name + '»: ' + (prof > prevP ? 'різкий ріст' : 'різкий спад') + ' — ' + (prof >= 0 ? 'прибуток ' : 'збиток ') + fmt(Math.abs(prof)) + '.', prof > prevP ? 'good' : 'bad');
+    if (stg && b.stg && b.stg !== 'старт' && stg !== b.stg && stg !== 'старт') say(s, '«' + b.name + '»: ' + { 'ріст': 'справа на підйомі.', 'стабільність': 'стабільний період.', 'спад': 'справи погіршуються.' }[stg], stg === 'спад' ? 'bad' : stg === 'ріст' ? 'good' : '');
+    b.stg = stg;
     if (b.cash < -0.3 * b.cap) out.push(bizCrisis(s, b));
   });
   return ownerPay;
