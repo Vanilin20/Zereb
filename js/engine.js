@@ -650,6 +650,23 @@ function finTick(s, ownerPay, side) {
     E('Їжа, побут, транспорт, розваги', food * mult); E('Оренда житла', housing * mult); E('Діти', kidsC); E('Утримання авто, речей і дому', ownUpkeep(s)); E('Ліки', chronicCost(s)); E('Непередбачені витрати', un);
     exp = (food + housing) * mult + kidsC + ownUpkeep(s) + chronicCost(s) + un;
   }
+  // коли грошей бракує, людина живе скромніше: урізає все, крім мінімуму. У борг іде лише те, чого не вистачило на мінімум
+  var debt0 = s.debt, cut = 0;
+  if (adult && !s.prison) {
+    var avail = inc + pshare + Math.max(0, s.money) - (s.debt > 0 ? s.debt * 0.13 : 0);
+    var floor = c.median * 0.42 * (s.withParents ? 0.5 : 1) + kidsC * 0.7 + chronicCost(s) + un;
+    if (exp > avail && exp > floor) {
+      cut = Math.min(exp - floor, exp - Math.max(avail, floor)); exp -= cut;
+      L.cut = cut; var fk = 'Їжа, побут, транспорт, розваги'; if (L.exp[fk]) { L.exp[fk] -= cut; if (L.exp[fk] < 1) delete L.exp[fk]; }
+      add(s, { happy: -clamp(cut / c.median * 12, 1, 8) });
+      if (!s.lastCutSay || s.age - s.lastCutSay >= 4) { s.lastCutSay = s.age; say(s, 'Грошей бракує — довелося жити скромніше: дешевша їжа, жодних розваг, усе найнеобхідніше.', 'bad'); }
+    }
+  }
+  if (s.debt > 0) {
+    // спершу гасимо дорогий борг із заощаджень, лишаючи подушку
+    var cushion = c.median * 0.25;
+    if (s.money > cushion) { var fromCash = Math.min(s.debt, s.money - cushion); payDebt(s, fromCash); s.money -= fromCash; L.fromCash = fromCash; }
+  }
   if (s.debt > 0) {
     var interest = s.debt * 0.13; s.debt += interest; if (s.debtSrc) for (var x in s.debtSrc) s.debtSrc[x] *= 1.13;
     var pay = Math.min(s.debt, Math.max(0, s.money + inc + pshare - exp) * 0.5); payDebt(s, pay); s.money -= pay;
@@ -658,7 +675,13 @@ function finTick(s, ownerPay, side) {
     if (s.debt < 1) { s.debt = 0; s.debtSrc = {}; s.credit = clamp(s.credit + 5); }
   } else if (s.age >= 18) s.credit = clamp(s.credit + 1);
   s.money += inc + pshare - exp;
-  if (s.money < 0) { addDebt(s, -s.money, 'не вистачало на життя'); L.short = -s.money; s.money = 0; }
+  if (s.money < 0) {
+    var lim = Math.max(s.lastInc || 0, c.median * 0.6) * 1.5;   // більше банки не позичають
+    if (s.debt > lim) { L.denied = 1; add(s, { happy: -6, health: -2 }); if (!s.lastDenySay || s.age - s.lastDenySay >= 3) { s.lastDenySay = s.age; say(s, 'Банки більше не позичають: борг завеликий. Живеш на мінімумі, дзвонять колектори.', 'bad'); } }
+    addDebt(s, -s.money, 'не вистачало на життя'); L.short = -s.money; s.money = 0;
+  }
+  // історія боргу: звідки він узявся рік за роком
+  if (debt0 > 0 || s.debt > 0) { s.debtLog = s.debtLog || []; s.debtLog.push({ a: s.age, y: s.year, s0: debt0, sh: L.short || 0, i: L.interest || 0, p: (L.fromCash || 0) + (L.exp['Погашення боргу'] || 0), e: s.debt, cut: cut }); if (s.debtLog.length > 12) s.debtLog.shift(); }
   s.lastInc = jp + ownerPay + side + (s.retired ? pension(s) : 0) + rent; s.hhInc = inc + pshare;
   s.lastExp = exp;
   L.age = s.age; L.year = s.year; L.invGain = gain;

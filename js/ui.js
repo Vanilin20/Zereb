@@ -246,7 +246,16 @@
       h += '<div class="sec">Борг</div><div class="kv"><span>Зараз винен</span><span class="neg">' + esc(fmt(S.debt)) + '</span></div><div class="kv"><span>Ставка</span><span>13% на рік' + (L.interest ? ' · за рік нараховано ' + esc(fmt(L.interest)) : '') + '</span></div>';
       if (L.short) h += '<div class="note">Минулого року на життя не вистачило ' + esc(fmt(L.short)) + ' — ця сума пішла в борг.</div>';
       var src = S.debtSrc || {}, ssum = 0; for (var q in src) ssum += src[q]; var kf = ssum > 0 ? S.debt / ssum : 0; src = Object.keys(src).reduce(function (o, q) { if (src[q] * kf >= 1) o[q] = src[q] * kf; return o; }, {}); Object.keys(src).sort(function (a, b) { return src[b] - src[a]; }).forEach(function (k) { h += '<div class="kv"><span>— ' + esc(k) + '</span><span>' + esc(fmt(src[k])) + '</span></div>'; });
-      h += '<div class="note">Борг гаситься автоматично половиною вільних грошей щороку. Кредитний рейтинг: ' + Math.round(S.credit) + '.</div>';
+      var DL = S.debtLog || [];
+      if (DL.length) {
+        var sSh = 0, sI = 0, sP = 0, sN = 0; DL.forEach(function (d) { sSh += d.sh; sI += d.i; sP += d.p; sN += d.e - d.s0 - d.sh - d.i + d.p; });
+        var why = sI > sSh && sI > sN ? 'відсотки: борг сам себе роздуває, бо погашаєш менше, ніж нараховується' : sSh >= sN ? 'щороку витрачаєш більше, ніж заробляєш, — різниця йде в борг' : 'нові кредити й разові витрати (лікування, навчання, покупки, бізнес)';
+        h += '<div class="note"><b>Головна причина за останні ' + DL.length + ' р.:</b> ' + why + '. Нестача на життя +' + esc(fmt(sSh)) + ', відсотки +' + esc(fmt(sI)) + ', нові кредити й інше ' + (sN >= 0 ? '+' : '−') + esc(fmt(Math.abs(sN))) + ', погашено −' + esc(fmt(sP)) + '.</div>';
+        h += '<div class="dtab"><div class="dr dh"><span>Вік</span><span>Було</span><span>Нестача</span><span>Відсотки</span><span>Погашено</span><span>Стало</span></div>' + DL.slice().reverse().map(function (d) { return '<div class="dr"><span>' + d.a + '</span><span>' + esc(fmt(d.s0)) + '</span><span class="neg">' + (d.sh ? '+' + esc(fmt(d.sh)) : '—') + '</span><span class="neg">' + (d.i ? '+' + esc(fmt(d.i)) : '—') + '</span><span class="pos">' + (d.p ? '−' + esc(fmt(d.p)) : '—') + '</span><span>' + esc(fmt(d.e)) + '</span></div>'; }).join('') + '</div>';
+      }
+      if (L.cut) h += '<div class="note">Цього року грошей бракувало, тож витрати урізано на ' + esc(fmt(L.cut)) + ': живеш на мінімумі.</div>';
+      if (L.denied) h += '<div class="note">Банки більше не позичають: борг перевищив півтора річного доходу.</div>';
+      h += '<div class="note">Борг гаситься автоматично: спершу з заощаджень (лишається невелика подушка), далі половиною вільних грошей щороку. Як вибратися: дешевший стиль життя в розкладі, краща робота, повернутися до батьків або оголосити банкрутство. Кредитний рейтинг: ' + Math.round(S.credit) + '.</div>';
     }
     h += '<div class="sec">Як змінювалося життя</div>' + chartsHTML('b');
     box.innerHTML = cur(h);

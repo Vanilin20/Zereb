@@ -291,3 +291,7 @@ select, input[type=text] { width: 100%; background: var(--raise); color: var(--t
 .mob { color: var(--muted); line-height: 1.5; margin: 6px 0 14px; }
 .rec { font-weight: 700; margin: 10px 0; }
 .seed-in { width: 100%; font: inherit; font-size: 20px; letter-spacing: .15em; text-transform: uppercase; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); margin-top: 6px; }
+.dtab { margin: 8px 0 12px; font-size: 12px; overflow-x: auto; }
+.dtab .dr { display: grid; grid-template-columns: 34px repeat(5, minmax(64px, 1fr)); gap: 6px; padding: 4px 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.dtab .dh { color: var(--muted); font-weight: 600; }
+.dtab .dr span:not(:first-child) { text-align: right; }

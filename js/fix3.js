@@ -114,3 +114,107 @@ function bizCompTick(s) {
   });
 }
 (function () { var lt = life2Tick; life2Tick = function (s, out) { lt(s, out); bizCompTick(s); }; })();
+
+// ======================================================================
+// Вибори: результат вирішують рішення під конкретну ситуацію, а не монетка
+// Тема виборів × тип суперника × твої сильні сторони; після кожного кроку видно, як змінилося опитування
+// ======================================================================
+var OPP_T = {
+  pop: { n: 'популіст', d: 'гучні обіцянки, натовп його любить', facts: 5, emo: -3, attack: -3, ad: 0 },
+  tech: { n: 'технократ', d: 'розумний, але сухий', facts: -3, emo: 5, attack: 2, ad: 0 },
+  olig: { n: 'ставленик олігарха', d: 'реклама на кожному білборді', facts: 2, emo: 2, attack: 6, ad: -3 },
+  vet: { n: 'політик зі стажем', d: 'його всі знають — і всі від нього втомилися', facts: 1, emo: 3, attack: 4, ad: 0 }
+};
+var ISSUES = { econ: 'економіка й робота', corr: 'корупція', war: 'безпека й війна', price: 'ціни й тарифи', health: 'лікарні', edu: 'школи й освіта' };
+function issueCred(s, k) {
+  // наскільки тобі вірять у цій темі
+  var P = s.pol;
+  if (k === 'econ') return (s.biz.length || s.bizHist.length ? 4 : 0) + (s.edu >= 5 ? 2 : 0) - (s.econ < 0 && P.party === 'rul' ? 4 : 0);
+  if (k === 'corr') return (P.dirty ? -6 * P.dirty : 4) + (hasRecord(s) ? -5 : 0);
+  if (k === 'war') return (s.flags.veteran ? 7 : s.flags.served ? 3 : s.flags.dodger ? -6 : 0);
+  if (k === 'health') return s.job && /doctor|nurse/.test(s.job.id) ? 6 : 1;
+  if (k === 'edu') return s.job && s.job.id === 'teacher' ? 6 : (s.edu >= 6 ? 3 : 1);
+  return 2;
+}
+campaign = function (s, target) {
+  var P = s.pol, offs = offices(s), c = C(s), notes = [];
+  var oppStr = gauss() * 5 + (P.office === target ? -(P.approval - 50) / 6 : 0) + [0, 2, 3, 10, 0, 27][target] + (target === 5 && autocracy(s) ? 20 : 0);
+  var base = 35 + s.st.social / 5 + s.fame / 5 + P.approval / 10 + (s.edu >= 5 ? 3 : 0) + (s.immigrant ? -12 : 0);
+  if (P.party === 'rul') base += (s.econ < 0 ? -8 : 6) + (autocracy(s) ? 25 : 0);
+  if (P.party === 'opp') base += (s.econ < 0 ? 8 : -3) - (autocracy(s) ? 35 : 0);
+  if (P.party === 'ind') base -= 6;
+  if (target === 5 && P.office === 4) base += 5;
+  var poll = clamp(50 + (base + 8 - OFFICE_BAR[target] - oppStr) * 1.2, 6, 88);
+  var issue = cf(s) === 2 ? 'war' : s.econ < 0 ? 'econ' : c.law < 0.5 && chance(0.5) ? 'corr' : pick(['econ', 'corr', 'price', 'health', 'edu', 'war']);
+  var otype = pick(Object.keys(OPP_T)), O2 = OPP_T[otype], other = pick(Object.keys(ISSUES).filter(function (k) { return k !== issue; }));
+  var ad = c.median * OFFICE_AD[target], local = target <= 2;
+  function sh(d) { var old = Math.round(poll); poll = clamp(poll + d, 3, 95); var nw = Math.round(poll); return nw === old ? 'опитування не змінилося (' + nw + '%)' : 'опитування: ' + old + '% → ' + nw + '%'; }
+  function head(t) { return t + ' Зараз у тебе ~' + Math.round(poll) + '%.'; }
+  function finish(last) {
+    var vote = clamp(poll + gauss() * 2.5, 2, 97), win = vote >= 50;
+    P.nextElec = s.age + electionCycle(s);
+    if (win) {
+      var prev = P.office; P.office = target; P.term = electionCycle(s); P.approval = clamp(40 + (vote - 50) * 2); P.terms = prev === target ? P.terms + 1 : 1;
+      if (target >= 2 && s.job) endJob(s, 'політика');
+      s.fame = clamp(s.fame + [0, 3, 8, 10, 0, 30][target]); add(s, { happy: 12 });
+      mark(s, offs[target] + (prev === target ? ' (переобрано)' : ''));
+      return (last ? last + ' ' : '') + 'Перемога: ' + Math.round(vote) + '% голосів. Тепер ти — ' + offs[target].toLowerCase() + '.' + (P.prom && P.prom.length ? ' Виборці памʼятають твої обіцянки.' : '') + (notes.length ? ' ' + notes.join(' ') : '');
+    }
+    add(s, { happy: -8 }); if (target === 5) { P.lostTop = s.age; s.fame = clamp(s.fame - 10); }
+    if (P.office === target) P.office = Math.max(0, target === 5 ? 3 : target - 1); else if (P.term === 0 && P.office > 0) { P.office = 0; notes.push('Попередню посаду ти теж втрати' + g(s, 'в', 'ла') + '.'); }
+    P.prom = [];
+    if (autocracy(s) && P.party === 'opp' && chance(0.25)) return court(s, '«екстремізм»', 2, 6);
+    return (last ? last + ' ' : '') + 'Поразка: ' + Math.round(vote) + '% голосів. Наступні вибори — через ' + electionCycle(s) + ' р.' + (notes.length ? ' ' + notes.join(' ') : '');
+  }
+  // 3. Дебати — залежать від типу суперника і твоїх сильних сторін
+  function debate(prev) {
+    var lead = poll - 50;
+    return { title: 'Дебати', text: (prev ? prev + '. ' : '') + head('Прямий ефір проти суперника (' + O2.n + ').'), opts: [
+      { t: 'Факти й цифри', sub: 'розум ' + statWord('smarts', s.st.smarts), f: function () { return twist(sh((s.st.smarts - 50) / 6 + O2.facts + gauss())); } },
+      { t: 'Історії живих людей', sub: 'харизма ' + statWord('social', s.st.social), f: function () { return twist(sh((s.st.social - 50) / 6 + O2.emo + gauss())); } },
+      { t: 'Атакувати його минуле', sub: 'працює не проти всіх', f: function () { return twist(sh(O2.attack + gauss() * 2)); } },
+      { t: 'Не йти на дебати', sub: lead > 8 ? 'ти лідер — можна не ризикувати' : 'виглядатиме як страх', f: function () { return twist(sh(lead > 8 ? -0.5 : -4)); } }] };
+  }
+  // 4. Подія останнього тижня — наслідок залежить від того, ким ти був, а не від монетки
+  function twist(prev) {
+    var r = R();
+    if (r < 0.3) { var real = (P.dirty || 0) + (hasRecord(s) ? 1 : 0) > 0; return { title: 'За тиждень до виборів', text: prev + '. Опоненти злили на тебе компромат.' + (real ? ' І частина — правда.' : ' Схоже, це фейк.'), opts: [
+      { t: 'Все заперечувати', sub: real ? 'якщо знайдуть докази — катастрофа' : 'фейк легко спростувати', f: function () { return finish(sh(real ? (chance(0.5) ? -1 : -9) : 2)); } },
+      { t: 'Визнати й вибачитися', sub: real ? 'чесність інколи цінують' : 'визнавати те, чого не було?', f: function () { return finish(sh(real ? -2 : -5)); } },
+      { t: 'Відповісти контркомпроматом', sub: 'брудно; ти теж станеш «брудним»', f: function () { P.dirty = (P.dirty || 0) + 1; return finish(sh(otype === 'olig' ? 4 : 1)); } }] }; }
+    if (r < 0.55) return { title: 'Пропозиція спонсора', text: prev + '. Бізнесмен готовий оплатити фінал кампанії. Каже, що потім «попросить про дрібницю».', opts: [
+      { t: 'Взяти гроші', sub: 'сильний фініш, але ти будеш винен', f: function () { P.owed = 1; return finish(sh(otype === 'olig' ? 5 : 3)); } },
+      { t: 'Відмовитися', sub: issue === 'corr' ? 'у кампанії про корупцію це оцінять' : '', f: function () { return finish(sh(issue === 'corr' ? 2 : 0)); } }] };
+    return finish(prev);
+  }
+  // 2. Ресурси
+  function resources(prev) {
+    var o = [
+      { t: 'Ходити від дверей до дверей', sub: local ? 'на місцевих виборах працює найкраще' : 'на загальних виборах це крапля в морі', f: function () { add(s, { health: -2 }); return debate(sh((local ? 4 : 1) + (s.st.social - 50) / 15)); } },
+      { t: 'Реклама на ТБ і в мережах', sub: fmt(ad) + (otype === 'olig' ? ' · його бюджет більший' : ''), dis: s.money < ad, f: function () { s.money -= ad; return debate(sh((local ? 3 : 6) + O2.ad)); } },
+      { t: 'Блогери й соцмережі', sub: s.age < 40 ? 'молодим вірять' : 'у твоєму віці це виглядає натужно', f: function () { return debate(sh(s.age < 40 ? 4 : 1)); } },
+      { t: 'Партійні волонтери', sub: P.party === 'ind' ? 'у незалежного їх майже нема' : 'безкоштовно', f: function () { return debate(sh(P.party === 'ind' ? 0.5 : 3)); } }];
+    if (c.law < 0.55) o.push({ t: 'Домовитися з місцевими «авторитетами»', sub: 'вони приведуть людей, але ти будеш винен', f: function () { P.owed = 1; P.dirty = (P.dirty || 0) + 1; return debate(sh(6)); } });
+    return { title: 'Ресурси', text: prev + '. ' + head('На що витратити останні тижні?'), opts: o };
+  }
+  // 1. Головне повідомлення
+  var cred = issueCred(s, issue), cred2 = issueCred(s, other);
+  var first = [
+    { t: 'Говорити про головне: ' + ISSUES[issue], sub: cred >= 4 ? 'тобі тут вірять' : cred <= -3 ? 'тобі тут не вірять' : 'тема гаряча', f: function () { return resources(sh(2 + cred)); } },
+    { t: 'Своя тема: ' + ISSUES[other], sub: cred2 >= 4 ? 'тут ти сильн' + g(s, 'ий', 'а') : 'людей зараз хвилює інше', f: function () { return resources(sh(cred2 - 1)); } },
+    { t: 'Бити по суперникові', sub: O2.n + ' — ' + O2.d, f: function () { return resources(sh(O2.attack - 1)); } },
+    { t: 'Обіцяти те, що хочуть почути', sub: 'зараз допоможе, але обіцянки доведеться виконувати', f: function () { P.prom = (P.prom || []).concat([{ t: ISSUES[issue], y: 2 }]); return resources(sh(5)); } }];
+  return { title: 'Вибори: ' + offs[target].toLowerCase(), text: 'Головна тема виборів — ' + ISSUES[issue] + '. Суперник — ' + O2.n + ' (' + O2.d + '). Опитування на старті: ~' + Math.round(poll) + '%. З чим ідеш до людей?', opts: first };
+};
+// невиконані обіцянки бʼють по рейтингу
+function promiseTick(s, out) {
+  var P = s.pol; if (!P || !P.office || !P.prom || !P.prom.length) return;
+  var p = P.prom[0];
+  if (--p.y > 0) return;
+  P.prom.shift();
+  var cost = C(s).median * [0, 0.5, 2, 3, 4, 10][P.office];
+  out.push({ title: 'Обіцянка', text: 'На виборах ти обіця' + g(s, 'в', 'ла') + ' зміни в темі «' + p.t + '». Люди чекають результату.', opts: [
+    { t: 'Продавити рішення', sub: 'політичні борги, конфлікти в команді', f: function () { if (chance(0.55 + s.st.smarts / 400)) { P.approval = clamp(P.approval + 10); return 'Вдалося! Рейтинг росте.'; } P.approval = clamp(P.approval - 4); return 'Рішення заблокували. Ти хоча б спробува' + g(s, 'в', 'ла') + '.'; } },
+    { t: 'Тихо забути', sub: 'рейтинг упаде', f: function () { P.approval = clamp(P.approval - 12); return 'Виборці помітили. Журналісти нагадують про обіцянку щотижня.'; } }] });
+}
+(function () { var lt = life2Tick; life2Tick = function (s, out) { lt(s, out); promiseTick(s, out); }; })();
