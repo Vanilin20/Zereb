@@ -90,7 +90,7 @@ function mobilityText(s, d2) {
   var d = s.d, diff = d2 - d, c = C(s);
   var head = g(s, 'Народився', 'Народилася') + ' в ' + d + '-му децилі, наприкінці — ' + d2 + '-й. ';
   var body = diff >= 4 ? 'Великий підйом: так вдається небагатьом.' : diff >= 1 ? 'Ти підня' + g(s, 'вся', 'лася') + ' вище, ніж почина' + g(s, 'в', 'ла') + '.' : diff === 0 ? 'Там, де почалося, — там і завершилося. Так буває найчастіше.' : diff >= -3 ? 'Ти скоти' + g(s, 'вся', 'лася') + ' нижче, ніж народи' + g(s, 'вся', 'лася') + '.' : 'Падіння з висоти, з якої народи' + g(s, 'вся', 'лася') + '.';
-  var tail = c.gini > 0.42 ? ' У країнах з такою нерівністю, як ' + c.name + ', рухатися вгору особливо важко.' : c.gini < 0.3 ? ' У ' + c.name + ' нерівність невелика — звідси легше піднятися.' : '';
+  var tail = c.gini > 0.42 ? ' У країнах з такою нерівністю, як ' + c.name + ', рухатися вгору особливо важко.' : c.gini < 0.3 ? ' ' + cap(inC(c)) + ' нерівність невелика — звідси легше піднятися.' : '';
   return head + body + tail;
 }
 
@@ -207,19 +207,15 @@ function snapDiff(s) {
 (function () {
   var sy = say;
   say = function (s, t, k) { if (s.nolog || !s.cur) return; var d = snapDiff(s); sy(s, t, k); if (d) s.cur.lines[s.cur.lines.length - 1].d = d; if (s._snap) s._snap = snapOf(s); };
-  var pe = pickEvents;
-  pickEvents = function (s, out) {
-    var evs = EVENTS, wrapped = evs.map(function (e) { var r0 = e.run; return { e: e, r0: r0 }; });
-    wrapped.forEach(function (x) { if (x.e.q == null) x.e.q = /opts\s*:/.test(x.r0.toString()); x.e.run = function (s2) { s2._snap = snapOf(s2); var r = x.r0(s2); return r; }; });
-    try { pe(s, out); } finally { wrapped.forEach(function (x) { x.e.run = x.r0; }); }
-    s._snap = null;
-  };
 })();
 
 // ======================================================================
 // Щорічні оновлення цього модуля
 // ======================================================================
-function life2Tick(s, out) { supportTick(s); remoteTick(s); dreamTick(s, out); if (s.pendDivorce) { var p = s.pendDivorce; s.pendDivorce = null; if (s.partner === p) out.push(divorcePrompt(s, p, 'them')); } }
+// Усі щорічні оновлення модулів — в одному списку, по порядку
+var YEARLY = [];
+function life2Tick(s, out) { YEARLY.forEach(function (f) { f(s, out); }); }
+YEARLY.push(function (s, out) { supportTick(s); remoteTick(s); dreamTick(s, out); if (s.pendDivorce) { var p = s.pendDivorce; s.pendDivorce = null; if (s.partner === p) out.push(divorcePrompt(s, p, 'them')); } });
 ACHIEVEMENTS.push({ id: 'dream', n: 'Мрія збулася', d: 'Здійснити мрію життя', t: function (s) { return (s.dreamsDone || []).length > 0; } });
 ACHIEVEMENTS.push({ id: 'ladder', n: 'З низів', d: 'Народитися в 1–3 децилі й завершити в 8–10', t: function (s) { return s.d <= 3 && s.age >= 30 && lifeDecile(s) >= 8; } });
 ACHIEVEMENTS.push({ id: 'remote', n: 'Світова зарплата', d: 'Працювати віддалено на іноземну компанію', t: function (s) { return s.tl.some(function (x) { return /Віддалена робота/.test(x.t); }); } });
@@ -266,6 +262,5 @@ function familyLuckTick(s, out) {
   var ac = admitChance;
   admitChance = function (s, f, kind) { return clamp(ac(s, f, kind) + (s.priv && !kind ? 0.1 : 0) + (s.d - 5) * 0.01, 0.03, 0.95); };
   // бізнес з батьківськими знайомствами живе довше
-  var lt = life2Tick;
-  life2Tick = function (s, out) { lt(s, out); familyLuckTick(s, out); };
+  YEARLY.push(familyLuckTick);
 })();

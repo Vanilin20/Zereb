@@ -106,7 +106,7 @@ evOver('parentcare');
 // ======================================================================
 var CONSC_TERM = { KR: '18 місяців', IL: s0 => s0.sex === 'm' ? '32 місяці' : '24 місяці', TR: '6–12 місяців', GR: '9–12 місяців', FI: '6–12 місяців', NO: 'рік', CH: '~4 місяці і щорічні збори', AT: '6 місяців', DK: '4–11 місяців', SE: '9–15 місяців', EG: '1–3 роки', IR: '~2 роки', VN: '2 роки', TH: 'до 2 років (за жеребом)', SG: '2 роки', LT: '9 місяців', EE: '8–11 місяців' };
 var CIVIL_SERVICE = ['FI', 'AT', 'CH', 'NO', 'DK', 'SE', 'KR', 'GR', 'EE', 'LT'];
-conscription = function (s) {
+function conscription(s) {
   var c = C(s), war = cf(s) === 2, term = CONSC_TERM[c.code]; term = typeof term === 'function' ? term(s) : (term || 'рік');
   var o = [
     { t: 'Відслужити', sub: term + (war ? ' · країна воює — ризик фронту' : ''), f: function () { s.flags.served = 1; mark(s, 'Строкова служба'); if (war && chance(0.3)) { s.army = { left: 1, front: 1 }; return 'Твій підрозділ відправили ближче до фронту.'; } add(s, { health: 4, social: 5, happy: -8, smarts: -1 }); s.friends++; return 'Служба позаду: дисципліна, армійські друзі й утома.'; } },
@@ -114,7 +114,7 @@ conscription = function (s) {
     { t: 'Підписати контракт', sub: 'стабільна зарплата, кар\'єра у війську', f: function () { s.flags.served = 1; takeJob(s, JOB.soldier); mark(s, 'Контракт зі збройними силами'); return 'Ти підписа' + g(s, 'в', 'ла') + ' контракт. Тепер це твоя професія.'; } },
     { t: 'Ухилитися', sub: c.law > 0.7 ? 'тут за це карають суворо' : 'можна відкупитися, але є ризик', f: function () { if (chance(c.law * 0.6)) { s.flags.dodger = 1; if (c.law > 0.8 && chance(0.5)) return court(s, 'ухилення від військової служби', 1, 2); s.money -= M(s) * 0.3; add(s, { happy: -6 }); return 'Тебе знайшли. Штраф ' + fmt(M(s) * 0.3) + ', і до армії все одно забрали.'; } s.flags.dodger = 1; add(s, { happy: -2 }); return 'Довідка від «знайомого лікаря» — і ти вільн' + g(s, 'ий', 'а') + '. Але в анкетах це питання ще спливатиме.'; } }];
   if (CIVIL_SERVICE.indexOf(c.code) >= 0) o.splice(1, 0, { t: 'Альтернативна (цивільна) служба', sub: 'довше, але без зброї', f: function () { s.flags.served = 1; add(s, { happy: -5, social: 3, smarts: 1 }); return 'Ти рік працюва' + g(s, 'в', 'ла') + ' в лікарні замість казарми.'; } });
-  return { title: 'Повістка', text: 'Тобі 18 — час на строкову службу в ' + c.name + ' (' + term + (c.consc === 2 ? '; тут служать і жінки, і чоловіки' : '') + ').', opts: o };
+  return { title: 'Повістка', text: 'Тобі 18 — час на строкову службу ' + inC(c) + ' (' + term + (c.consc === 2 ? '; тут служать і жінки, і чоловіки' : '') + ').', opts: o };
 };
 function armyTick(s, out) {
   if (s.army) {
@@ -197,7 +197,7 @@ evOver('tutor', [14, 17], 2, function (s) { return s.q >= 3 && s.study && s.stud
 // Повтори подій: кулдаун і спадна вага
 // ======================================================================
 var EV_CD = { unexp: 1, airraid: 1, heat: 2, flood: 3, commute: 3 };
-pickEvents = function (s, out) {
+function pickEvents(s, out) {
   s.seenAt = s.seenAt || {}; s.pyr = s.pyr || [];
   var hadPrompt = out.length > 0, calm = s.pyr.length >= 2 && s.pyr[0] && s.pyr[1];   // два роки поспіль з виборами — дати перепочити
   var pool = EVENTS.filter(function (e) {
@@ -216,10 +216,11 @@ pickEvents = function (s, out) {
     w /= 1 + (s.seen[e.id] || 0) * 0.7;
     if (!chance((isQ ? 0.045 : 0.07) * w)) return;
     n++; s.seen[e.id] = (s.seen[e.id] || 0) + 1; s.seenAt[e.id] = s.age;
+    s._snap = snapOf(s);
     var r = e.run(s);
-    if (!r) return;
-    if (typeof r === 'string') say(s, r, e.k || '');
-    else { prompts++; r.title = r.title || e.title || 'Подія'; spice(s, r); out.push(r); }
+    if (!r) { s._snap = null; return; }
+    if (typeof r === 'string') { say(s, r, e.k || ''); s._snap = null; }
+    else { s._snap = null; prompts++; r.title = r.title || e.title || 'Подія'; spice(s, r); out.push(r); }
   });
   s.pyr.unshift(out.length > 0); s.pyr.length = 2;
 };
@@ -292,7 +293,7 @@ function epitaph(s) {
   if (s.gang && s.gang.rank === 4) who = s.gang.kind === 'картель' ? 'глава картелю' : 'дон';
   bits.push(c.flag + ' ' + c.name + ', ' + s.birthYear + '–' + s.year + '. ' + cap(who) + '.');
   var t = [];
-  if (s.countries.length > 1) t.push(s.countries.length === 2 ? g(s, 'емігрував', 'емігрувала') + ' до ' + COUNTRIES[s.countries[1]].name : 'жи' + g(s, 'в', 'ла') + ' у ' + s.countries.length + ' країнах');
+  if (s.countries.length > 1) t.push(s.countries.length === 2 ? g(s, 'емігрував', 'емігрувала') + ' до ' + genC(s.countries[1]) : 'жи' + g(s, 'в', 'ла') + ' у ' + s.countries.length + ' країнах');
   if (s.marriages > 1) t.push('ма' + g(s, 'в', 'ла') + ' ' + s.marriages + ' шлюби'); else if (s.marriages === 1) t.push(s.partner && s.partner.married && s.partner.yrs >= 25 ? 'прожи' + g(s, 'в', 'ла') + ' у шлюбі ' + s.partner.yrs + ' р.' : g(s, 'одружився', 'вийшла заміж'));
   if (s.kids.length) t.push('вихова' + g(s, 'в', 'ла') + ' ' + s.kids.length + ' ' + (s.kids.length === 1 ? 'дитину' : s.kids.length < 5 ? 'дітей' : 'дітей'));
   if (s.flags.veteran) t.push('пройш' + g(s, 'ов', 'ла') + ' війну');

@@ -22,64 +22,10 @@ function polTargets(s) {
 var OFFICE_BAR = [0, 52, 58, 60, 0, 80];   // скільки «очок» треба, щоб перемогти
 var OFFICE_AD = [0, 0.2, 0.8, 1.5, 0, 5];   // ціна реклами (× медіанний дохід)
 
-function campaign(s, target) {
-  var P = s.pol, offs = offices(s), score = 0, notes = [], c = C(s), oppStr = gauss() * 6 + (P.office === target ? -(P.approval - 50) / 6 : 0) + [0, 0, 3, 10, 0, 22][target] + (target === 5 && autocracy(s) ? 20 : 0);
-  var base = 35 + s.st.social / 5 + s.fame / 5 + P.approval / 10 + (s.edu >= 5 ? 3 : 0) + (s.immigrant ? -12 : 0);
-  if (P.party === 'rul') base += (s.econ < 0 ? -8 : 6) + (autocracy(s) ? 25 : 0);
-  if (P.party === 'opp') base += (s.econ < 0 ? 8 : -3) - (autocracy(s) ? 35 : 0);
-  if (P.party === 'ind') base -= 6;
-  if (target === 5 && P.office === 4) base += 5;
-  score = base;
-  function finish() {
-    var total = score + gauss() * 7, bar = OFFICE_BAR[target] + oppStr;
-    P.nextElec = s.age + electionCycle(s);
-    if (total >= bar) {
-      var prev = P.office; P.office = target; P.term = electionCycle(s); P.approval = clamp(50 + (total - bar)); P.terms = prev === target ? P.terms + 1 : 1;
-      if (target >= 2 && s.job) endJob(s, 'політика');
-      s.fame = clamp(s.fame + [0, 3, 8, 10, 0, 30][target]); add(s, { happy: 12 });
-      mark(s, offs[target] + (prev === target ? ' (переобрано)' : ''));
-      return 'Перемога! ' + Math.round(50 + (total - bar) / 2) + '% голосів. Тепер ти — ' + offs[target].toLowerCase() + '.' + (notes.length ? ' ' + notes.join(' ') : '');
-    }
-    add(s, { happy: -8 }); if (target === 5) { P.lostTop = s.age; s.fame = clamp(s.fame - 10); }
-    if (P.office === target) { P.office = Math.max(0, target === 5 ? 3 : target - 1); } else if (P.term === 0 && P.office > 0) { P.office = 0; notes.push('Попередню посаду ти теж втрати' + g(s, 'в', 'ла') + '.'); }
-    if (autocracy(s) && P.party === 'opp' && chance(0.25)) return court(s, '«екстремізм»', 2, 6);
-    return 'Поразка: ' + Math.round(Math.max(3, 45 - (bar - total))) + '% голосів. Наступні вибори — через ' + electionCycle(s) + ' р.' + (notes.length ? ' ' + notes.join(' ') : '');
-  }
-  function twist() {
-    var r = R();
-    if (r < 0.35) return { title: 'За тиждень до виборів', text: 'Опоненти злили на тебе компромат: старі борги, сумнівні знайомства й фото з вечірки.', opts: [
-      { t: 'Все заперечувати', f: function () { score += chance(0.5) ? 2 : -8; return finish(); } },
-      { t: 'Чесно визнати й вибачитися', f: function () { score += chance(0.6) ? 3 : -4; return finish(); } },
-      { t: 'Відповісти контркомпроматом', sub: 'брудно, але працює', f: function () { score += rnd(-6, 8); P.dirty = (P.dirty || 0) + 1; return finish(); } }] };
-    if (r < 0.6) return { title: 'Пропозиція спонсора', text: 'Великий бізнесмен готовий профінансувати фінал кампанії. Натякає, що потім «попросить про дрібницю».', opts: [
-      { t: 'Взяти гроші', sub: 'сильна реклама, але ти будеш винен', f: function () { score += 8; P.owed = 1; return finish(); } },
-      { t: 'Відмовитися', f: function () { score += 1; return finish(); } }] };
-    if (r < 0.8 && P.party !== 'rul') return { title: 'Пропозиція коаліції', text: 'Інша партія пропонує обʼєднатися: їхні голоси в обмін на посаду для їхнього лідера.', opts: [
-      { t: 'Погодитися', f: function () { score += 7; P.approval -= 3; return finish(); } },
-      { t: 'Йти самостійно', f: function () { return finish(); } }] };
-    return finish();
-  }
-  function debate() {
-    return { title: 'Дебати', text: 'Прямий ефір. Опонент щойно звинуватив тебе в некомпетентності.', opts: [
-      { t: 'Факти й цифри', sub: 'розум', f: function () { score += (s.st.smarts - 50) / 4 + rnd(-3, 3); return twist(); } },
-      { t: 'Емоції й історії людей', sub: 'харизма', f: function () { score += (s.st.social - 50) / 4 + rnd(-3, 3); return twist(); } },
-      { t: 'Атакувати у відповідь', sub: 'ризиковано', f: function () { score += rnd(-8, 10); return twist(); } },
-      { t: 'Не йти на дебати', f: function () { score -= 5; return twist(); } }] };
-  }
-  var ad = c.median * OFFICE_AD[target];
-  var opts = [
-    { t: 'Агітація від дверей до дверей', sub: 'дешево, працює харизма', f: function () { score += s.st.social / 12 + (target <= 2 ? 5 : 1); add(s, { health: -2 }); return debate(); } },
-    { t: 'Реклама на ТБ і в мережах', sub: fmt(ad), dis: s.money < ad, f: function () { s.money -= ad; score += 9; return debate(); } },
-    { t: 'Обіцяти всім усе', sub: 'зараз допоможе, потім розчарує', f: function () { score += 7; P.promises = (P.promises || 0) + 1; return debate(); } },
-    { t: 'Компромат на суперника', sub: 'може вдарити по тобі', f: function () { if (chance(0.6)) score += 8; else { score -= 6; notes.push('Компромат виявився фейком — це обговорювали тиждень.'); } return debate(); } }
-  ];
-  if (c.law < 0.5) opts.push({ t: 'Підкупити виборців', sub: fmt(ad * 0.6) + ' · тут це «працює»', dis: s.money < ad * 0.6, f: function () { s.money -= ad * 0.6; score += 12; if (chance(c.law * 0.5)) { notes.push('Схему підкупу викрили журналісти.'); score -= 15; P.dirty = (P.dirty || 0) + 2; } return debate(); } });
-  return { title: 'Вибори: ' + offs[target].toLowerCase(), text: (function () { var est = clamp(Math.round(50 + (base + 6 - OFFICE_BAR[target] - oppStr) * 1.3), 8, 85); return 'Суперник: ' + (oppStr > 4 ? 'сильний' : oppStr < -4 ? 'слабкий' : 'рівний тобі') + '. Опитування дають тобі ~' + est + '% (похибка ±7). '; })() + 'Ти йдеш як ' + partyName(P.party) + '. ' + (autocracy(s) ? (P.party === 'opp' ? 'Тут вибори контролює влада — опозиції майже нічого не світить.' : 'Тут вибори — формальність для правлячої партії.') : 'Як будуєш кампанію?'), opts: opts };
-}
 
 A({ id: 'politics', tab: 'work', n: 'Піти в політику', d: function (s) { return isCitizen(s) ? 'Партія, вибори, посади' + (s.birth !== s.country ? ' · главою держави може стати лише народжений тут' : '') : 'Потрібне громадянство цієї країни'; }, show: function (s) { return s.age >= 21 && !s.pol && !s.prison; },
   run: function (s) {
-    if (!isCitizen(s)) return 'У ' + C(s).name + ' в політику можуть іти лише громадяни.';
+    if (!isCitizen(s)) return cap(inC(C(s))) + ' в політику можуть іти лише громадяни.';
     function join(p) { return function () { s.pol = { office: 0, party: p, approval: 50, terms: 0, nextElec: s.age + 1 }; mark(s, 'Політика: ' + partyName(p)); return 'Ти тепер ' + partyName(p) + '. Перші вибори — вже наступного року.'; }; }
     return { title: 'Політика', text: autocracy(s) ? 'У цій країні реальна влада — в однієї партії. Опозиціонерам тут небезпечно.' : 'З чого почати?', opts: [
       { t: 'Вступити в правлячу партію', sub: s.econ < 0 ? 'зараз криза — партію не люблять' : 'легше перемагати, поки економіка росте', f: join('rul') },
@@ -175,7 +121,7 @@ ev('p_kids', [22, 42], 3, function (s) { var p = s.partner; return p && enrichPa
 });
 ev('p_abroad', [22, 55], 2, function (s) { return s.partner && s.partner.yrs >= 1 && s.age < 55; }, function (s) {
   var p = s.partner, d = pick(EMIGRATE_TO.filter(function (c) { return c !== s.country; }));
-  return { text: p.name + ' отрима' + gp(p, 'в', 'ла') + ' пропозицію роботи в ' + COUNTRIES[d].name + ' ' + COUNTRIES[d].flag + '. Зарплата значно більша.', opts: [
+  return { text: p.name + ' отрима' + gp(p, 'в', 'ла') + ' пропозицію роботи ' + inC(COUNTRIES[d]) + ' ' + COUNTRIES[d].flag + '. Зарплата значно більша.', opts: [
     { t: 'Переїхати разом', f: function () { if (!s.partner) return ''; p.inc *= 1.8; p.rel += 10; return emigrate(s, d, 'переїзд за партнером'); } },
     { t: 'Стосунки на відстані', f: function () { if (!s.partner) return ''; p.inc *= 1.8; p.rel -= 15; p.far = 1; return 'Тепер ви бачитеся раз на кілька місяців.'; } },
     { t: 'Попросити відмовитися', f: function () { if (!s.partner) return ''; if (chance(0.6)) { p.rel -= 10; return p.name + ' лиши' + gp(p, 'вся', 'лася') + ', але це запамʼятає.'; } s.partner = null; s.exes++; add(s, { happy: -12 }); return p.name + ' поїха' + gp(p, 'в', 'ла') + ' сам' + gp(p, '', 'а') + '. Ви розійшлися.'; } }] };
@@ -223,7 +169,7 @@ ev('k_teen', [28, 75], 4, function (s) { return s.kids.some(function (k) { retur
 });
 ev('k_abroad', [40, 85], 2, function (s) { return s.kids.some(function (k) { return k.alive && k.age >= 18 && k.age <= 30 && !k.abroad; }); }, function (s) {
   var k = pick(s.kids.filter(function (x) { return x.alive && x.age >= 18 && x.age <= 30 && !x.abroad; })), d = pick(EMIGRATE_TO.filter(function (c) { return c !== s.country; }));
-  return { text: k.name + ' хоче переїхати жити в ' + COUNTRIES[d].name + ' ' + COUNTRIES[d].flag + '.', opts: [
+  return { text: k.name + ' хоче переїхати жити ' + inC(COUNTRIES[d]) + ' ' + COUNTRIES[d].flag + '.', opts: [
     { t: 'Підтримати й допомогти грошима', sub: fmt(M(s) * 0.3), f: function () { s.money -= M(s) * 0.3; k.abroad = d; k.rel += 10; return k.name + ' поїха' + gp(k, 'в', 'ла') + ' з твоїм благословенням. Дзвоните щонеділі.'; } },
     { t: 'Просто побажати успіху', f: function () { k.abroad = d; return k.name + ' поїха' + gp(k, 'в', 'ла') + '.'; } },
     { t: 'Відмовляти', f: function () { if (chance(0.4)) { k.rel -= 5; return k.name + ' лиши' + gp(k, 'вся', 'лася') + ' — але питання ще повернеться.'; } k.abroad = d; k.rel -= 15; return k.name + ' все одно поїха' + gp(k, 'в', 'ла') + '. Тепер ви рідко розмовляєте.'; } }] };

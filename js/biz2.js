@@ -173,7 +173,6 @@ function bizEventTick(s, out) {
       } };
     }) };
   };
-  // старі «можливості» з fix3 більше не потрібні
-  bizMenu = function (s, b) { return a.run(s); };
 })();
-(function () { var lt = life2Tick; life2Tick = function (s, out) { lt(s, out); bizEventTick(s, out); }; })();
+YEARLY.push(bizEventTick);
+function bizMenu(s, b) { return ACTIONS.filter(function (x) { return x.id === 'bizmanage'; })[0].run(s); }

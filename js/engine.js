@@ -674,7 +674,11 @@ function finTick(s, ownerPay, side) {
     if (s.money > cushion) { var fromCash = Math.min(s.debt, s.money - cushion); payDebt(s, fromCash); s.money -= fromCash; L.fromCash = fromCash; }
   }
   if (s.debt > 0) {
-    var interest = s.debt * 0.13; s.debt += interest; if (s.debtSrc) for (var x in s.debtSrc) s.debtSrc[x] *= 1.13;
+    // прострочений борг понад ліміт — у колекторів: відсотки вже не 13%, а невеликі судові
+    var dLim = Math.max(s.lastInc || 0, c.median * 0.6) * 1.5, deflt = s.debt > dLim * 1.5, rate = deflt ? 0 : 0.13;
+    s.defYrs = deflt ? (s.defYrs || 0) + 1 : 0;
+    if (s.defYrs >= 7) { var wo = s.debt * 0.6; payDebt(s, wo); s.defYrs = 0; L.writeoff = wo; say(s, 'Минуло багато років без виплат: частину старих боргів (' + fmt(wo) + ') списано за давністю.', 'good'); }
+    var interest = s.debt * rate; s.debt += interest; if (s.debtSrc) for (var x in s.debtSrc) s.debtSrc[x] *= 1 + rate;
     var pay = Math.min(s.debt, Math.max(0, s.money + inc + pshare - exp) * 0.5); payDebt(s, pay); s.money -= pay;
     E('Погашення боргу', pay); L.interest = interest;
     s.credit = clamp(s.credit + (pay >= interest ? 2 : -8));
@@ -683,8 +687,11 @@ function finTick(s, ownerPay, side) {
   s.money += inc + pshare - exp;
   if (s.money < 0) {
     var lim = Math.max(s.lastInc || 0, c.median * 0.6) * 1.5;   // більше банки не позичають
-    if (s.debt > lim) { L.denied = 1; add(s, { happy: -6, health: -2 }); if (!s.lastDenySay || s.age - s.lastDenySay >= 3) { s.lastDenySay = s.age; say(s, 'Банки більше не позичають: борг завеликий. Живеш на мінімумі, дзвонять колектори.', 'bad'); } }
-    addDebt(s, -s.money, 'не вистачало на життя'); L.short = -s.money; s.money = 0;
+    if (s.debt > lim) {
+      // позичати ніхто не дає: нестача не стає боргом — це неоплачені рахунки, відключення, життя впритул
+      L.denied = 1; L.unpaid = -s.money; s.money = 0; add(s, { happy: -6, health: -3 });
+      if (!s.lastDenySay || s.age - s.lastDenySay >= 3) { s.lastDenySay = s.age; say(s, 'Банки більше не позичають. Рахунки лишаються неоплаченими, світло відключають, дзвонять колектори.', 'bad'); }
+    } else { addDebt(s, -s.money, 'не вистачало на життя'); L.short = -s.money; s.money = 0; }
   }
   // історія боргу: звідки він узявся рік за роком
   if (debt0 > 0 || s.debt > 0) { s.debtLog = s.debtLog || []; s.debtLog.push({ a: s.age, y: s.year, s0: debt0, sh: L.short || 0, i: L.interest || 0, p: (L.fromCash || 0) + (L.exp['Погашення боргу'] || 0), e: s.debt, cut: cut }); if (s.debtLog.length > 12) s.debtLog.shift(); }
@@ -813,19 +820,6 @@ function die(s, cause) {
 
 // ---------- Події ----------
 var EVENTS = [];
-function pickEvents(s, out) {
-  var pool = EVENTS.filter(function (e) { return s.age >= e.a[0] && s.age <= e.a[1] && (!e.once || !s.seen[e.id]) && (!e.if || e.if(s)); });
-  var n = 0, maxN = s.age < 6 ? 1 : 2;
-  shuffle(pool).forEach(function (e) {
-    if (n >= maxN || !s.alive) return;
-    var w = typeof e.w === 'function' ? e.w(s) : (e.w == null ? 1 : e.w);
-    if (!chance(0.05 * w)) return;
-    n++; s.seen[e.id] = (s.seen[e.id] || 0) + 1;
-    var r = e.run(s);
-    if (!r) return;
-    if (typeof r === 'string') say(s, r, e.k || ''); else { r.title = r.title || e.title || 'Подія'; out.push(r); }
-  });
-}
 
 // ---------- Рік ----------
 function apFor(age, s) { if (s && s.prison > 0) return 1; return age < 6 ? 0 : age < 13 ? 2 : age < 18 ? 3 : age < 80 ? 4 : 2; }
@@ -870,12 +864,6 @@ function ageUp(s) {
   schedDefaults(s); schedFit(s);
   s.used = {}; s.ap = apFor(s.age, s);
   return out;
-}
-function conscription(s) {
-  return { title: 'Повістка', text: 'Тобі 18 — час іти на строкову службу (' + C(s).name + (C(s).consc === 2 ? ', тут служать і жінки, і чоловіки' : '') + ').', opts: [
-    { t: 'Відслужити', sub: 'рік у війську', f: function () { add(s, { health: 4, social: 5, happy: -8, smarts: -1 }); s.flags.served = 1; mark(s, 'Строкова служба'); return 'Рік служби позаду: дисципліна, нові друзі й утома.'; } },
-    { t: 'Вступити до вишу і отримати відстрочку', sub: 'потрібно вступити', f: function () { return { title: 'Спеціальність', text: 'Студентам дають відстрочку.', opts: uniOpts(s) }; } }
-  ] };
 }
 function treatCost(s, k) { var c = C(s); var m = { free: 0.05, mixed: 0.5, paid: c.code === 'US' ? (s.job ? 0.35 : 1.6) : 1.1 }[c.health]; return c.median * m * (k || 1); }
 function healthName(c) { return { free: 'безкоштовна (страхова)', mixed: 'частково платна', paid: 'платна' }[c.health]; }
@@ -1000,7 +988,7 @@ function creditTick(s, out) {
   if (s.flags.bankrupt) { s.flags.bankrupt--; if (!s.flags.bankrupt) say(s, 'Мітка банкрутства зникла з кредитної історії.', 'good'); }
   var heavy = s.debt > Math.max(3 * Math.max(s.lastInc, 1), 2 * M(s));
   s.debtYrs = heavy ? (s.debtYrs || 0) + 1 : 0;
-  if (s.debtYrs >= 2 && s.age >= 18 && !s.flags.bankrupt) out.push({ title: 'Борги душать', text: 'Борг ' + fmt(s.debt) + ' — це кілька твоїх річних доходів, і він росте через відсотки. Кредитний рейтинг: ' + Math.round(s.credit) + '.', opts: [
+  if (s.debtYrs >= 2 && s.age >= 18 && !s.flags.bankrupt && !(s.debtAsk && s.age - s.debtAsk < 6) && (s.debtAsk = s.age)) out.push({ title: 'Борги душать', text: 'Борг ' + fmt(s.debt) + ' — це кілька твоїх річних доходів, і він росте через відсотки. Кредитний рейтинг: ' + Math.round(s.credit) + '.', opts: [
     { t: 'Оголосити банкрутство', sub: 'частину боргу спишуть, майно продадуть, 7 років без кредитів', f: function () { var sold = 0; if (s.home) { sold += s.home.val; s.debt -= s.home.val; s.home = null; } s.rentals.forEach(function (r) { sold += r.val; s.debt -= r.val; }); s.rentals = []; if (sold) cashNote(s, 'Продаж майна при банкрутстві', sold); var before = Math.max(0, s.debt); s.debt = Math.max(0, s.debt * 0.2); cashNote(s, 'Списано боргу при банкрутстві', before - s.debt); if (s.debt <= 0 && s.money < 0) s.money = 0; s.credit = 5; s.flags.bankrupt = 7; s.debtYrs = 0; mark(s, 'Банкрутство'); add(s, { happy: -8 }); return 'Банкрутство оголошено. Борг зменшено до ' + fmt(s.debt) + '.'; } },
     { t: 'Платити далі', sub: 'стрес, але без мітки в історії', f: function () { add(s, { happy: -8, health: -3 }); s.debtYrs = 0; return 'Ти виріши' + g(s, 'в', 'ла') + ' розплачуватися сам' + g(s, '', 'а') + '.'; } }] });
 }

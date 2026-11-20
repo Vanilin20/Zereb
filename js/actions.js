@@ -23,7 +23,7 @@ A({ id: 'travel', tab: 'me', n: 'Подорож', d: function (s) { return 'Ща
     var cost = M(s) * 0.15 * [0.6, 1, 2.5][s.ls]; s.money -= cost; s.stat.travels++;
     var dest = pick(COUNTRY_LIST.filter(function (c) { return c.code !== s.country && c.conflict < 2; }));
     add(s, { happy: ri(8, 14), eng: 2, social: 2 });
-    return 'Подорож до ' + dest.name + ' ' + dest.flag + ' — ' + pick(['незабутньо.', 'втомливо, але варто того.', 'ти поверну' + g(s, 'вся', 'лася') + ' іншою людиною.', 'дорого, але щасливо.']);
+    return 'Подорож до ' + genC(dest) + ' ' + dest.flag + ' — ' + pick(['незабутньо.', 'втомливо, але варто того.', 'ти поверну' + g(s, 'вся', 'лася') + ' іншою людиною.', 'дорого, але щасливо.']);
   } });
 A({ id: 'volunteer', tab: 'me', n: 'Волонтерство', d: 'Щастя, харизма, друзі', show: function (s) { return s.age >= 12; },
   run: function (s) { add(s, { happy: 4, social: 3 }); if (chance(0.3)) s.friends++; return 'Ти допомага' + g(s, 'в', 'ла') + ' іншим. Це наповнює.'; } });
@@ -213,8 +213,6 @@ A({ id: 'home', tab: 'money', n: 'Купити житло', ap: 0, d: function (
   } });
 A({ id: 'sellhome', tab: 'money', n: 'Продати житло', ap: 0, d: function (s) { return s.home ? fmt(s.home.val) : ''; }, show: function (s) { return !!s.home; },
   run: function (s) { var v = s.home.val; s.money += v; s.home = null; s.own.homeLvl = 0; return 'Житло продано за ' + fmt(v) + '.'; } });
-A({ id: 'rental', tab: 'money', n: 'Квартира під оренду', ap: 0, d: function (s) { return fmt(M(s) * C(s).house) + ' · ~' + (42 / C(s).house).toFixed(1).replace('.', ',') + '% на рік'; }, show: function (s) { return s.age >= 21 && s.money >= M(s) * C(s).house; },
-  run: function (s) { var c = M(s) * C(s).house; s.money -= c; s.rentals.push({ val: c }); return 'Ти купи' + g(s, 'в', 'ла') + ' квартиру для оренди. Їх у тебе: ' + s.rentals.length + '.'; } });
 A({ id: 'lifestyle', tab: 'money', n: 'Стиль життя', ap: 0, d: function (s) { return ['Скромний', 'Звичайний', 'Розкішний'][s.ls]; }, show: function (s) { return s.age >= 16; },
   run: function (s) { return { title: 'Стиль життя', text: 'Більше витрат — більше щастя, але менше заощаджень.', opts: [['Скромний', 0], ['Звичайний', 1], ['Розкішний', 2]].map(function (x) { return { t: x[0], sub: 'витрати ×' + [0.7, 1, 1.9][x[1]], f: function () { s.ls = x[1]; return 'Стиль життя: ' + x[0].toLowerCase() + '.'; } }; }) }; } });
 
@@ -237,32 +235,6 @@ A({ id: 'openbiz', tab: 'biz', n: 'Відкрити бізнес', d: 'Видн�
   } });
 A({ id: 'bizmanage', tab: 'biz', n: 'Керувати бізнесом', ap: 0, d: function (s) { return s.biz.map(function (b) { return b.name; }).join(', '); }, show: function (s) { return s.biz.length > 0; },
   run: function (s) { return { title: 'Мої бізнеси', text: 'Обери бізнес.', opts: s.biz.map(function (b) { return { t: b.name, sub: 'рік ' + b.yrs + ' · ' + (b.last >= 0 ? '+' : '') + fmt(b.last) + ' · каса ' + fmt(b.cash) + ' · вартість ~' + fmt(bizValue(s, b)), f: function () { return bizMenu(s, b); } }; }) }; } });
-function bizMenu(s, b) {
-  var o = [];
-  b.acts = b.acts && b.acts.age === s.age ? b.acts : { age: s.age };
-  var done = function (k) { return !!b.acts[k]; }, mark1 = function (k) { b.acts[k] = 1; };
-  var sat = BIZM[b.type].cost * M(s) * (BIZ_SCALE[b.type] || 20);
-  if (!b.focus) o.push({ t: 'Працювати в бізнесі на повну цього року', sub: 'підготовка ↑, але менше відпочинку (−10 год/тиждень)', f: function () { b.focus = true; add(s, { happy: -3, health: -1 }); return 'Цього року ти тягнеш «' + b.name + '» на собі.'; } });
-  var ex = b.cap * 0.5;
-  o.push({ t: 'Розширити за ' + fmt(ex), sub: done('ex') ? 'вже розширював цього року' : b.cap > sat ? 'ринок насичений — віддача від розширення падає' : 'більший оборот і більший ризик · раз на рік', dis: s.money < ex || done('ex'), f: function () { mark1('ex'); s.money -= ex; b.cap += ex; return '«' + b.name + '» розширено.'; } });
-  var maxStaff = Math.max(1, Math.floor(b.cap / (M(s) * 0.3)));
-  var addN = Math.min(3, maxStaff - (b.staff || 0)), hire = addN * M(s) * 0.3;
-  o.push({ t: 'Найняти працівників (' + (b.staff || 0) + ' → ' + ((b.staff || 0) + addN) + ') за ' + fmt(hire), sub: 'наймання й обладнання зараз; далі кожен коштує ~' + fmt(M(s) * 0.9) + '/рік із каси й приносить більше, якщо добре керуєш · макс. ' + maxStaff + ' на капітал ' + fmt(b.cap), dis: addN <= 0 || s.money < hire || done('hire'), f: function () { mark1('hire'); s.money -= hire; b.staff = (b.staff || 0) + addN; return 'У «' + b.name + '» тепер ' + b.staff + ' працівників.'; } });
-  if (b.staff) o.push({ t: 'Скоротити працівників (' + b.staff + ' → ' + Math.max(0, b.staff - 3) + ')', f: function () { b.staff = Math.max(0, b.staff - 3); add(s, { happy: -2 }); return 'Довелося скоротити людей.'; } });
-  var T = BIZM[b.type];
-  if (T.points) { var pc = T.cost * M(s); o.push({ t: 'Відкрити ще одну точку за ' + fmt(pc), sub: 'точок: ' + (b.points || 1) + ' · раз на рік', dis: s.money < pc || done('pt'), f: function () { mark1('pt'); s.money -= pc; b.cap += pc * 0.8; b.cash += pc * 0.2; b.points = (b.points || 1) + 1; mark(s, '«' + b.name + '»: ' + b.points + ' точки'); return 'Відкрито нову точку «' + b.name + '». Усього: ' + b.points + '.'; } }); }
-  if (T.points && b.fran == null && (b.points || 1) >= 3 && b.yrs >= 4) o.push({ t: 'Запустити франшизу', sub: 'інші відкриватимуть точки під твоїм брендом і платитимуть роялті', f: function () { b.fran = 0; mark(s, 'Франшиза «' + b.name + '»'); return 'Франшизу «' + b.name + '» запущено.'; } });
-  if (!b.inv) o.push({ t: 'Залучити інвестора', sub: 'гроші в обмін на частку · твоя частка ' + Math.round((b.share || 1) * 100) + '%', f: function () {
-    b.inv = s.age; var q = bizQ(s, b), p = clamp(0.15 + q / 150 + (b.last > 0 ? 0.15 : 0) + (T.startup ? 0.1 : 0), 0.05, 0.85);
-    if (!chance(p)) return 'Інвестори подивилися цифри й відмовили.';
-    var amt = b.cap * rnd(0.5, 1.5), stake = amt / (bizValue(s, b) / (b.share || 1) + amt); b.cap += amt; b.share = (b.share || 1) * (1 - stake);
-    return 'Інвестор вклав ' + fmt(amt) + ' за ' + Math.round(stake * 100) + '% «' + b.name + '». Твоя частка тепер ' + Math.round(b.share * 100) + '%.'; } });
-  o.push({ t: b.mgr ? 'Звільнити управителя' : 'Найняти управителя', sub: b.mgr ? 'керуватимеш сам' : 'коштує ~' + fmt(M(s) * 0.8) + '/рік, звільняє твій час', f: function () { b.mgr = !b.mgr; b.effort = b.mgr ? 0.2 : (s.job ? 0.5 : 1); return b.mgr ? 'Управитель найнятий.' : 'Ти знову керуєш сам.'; } });
-  o.push({ t: 'Дивіденди: ' + Math.round(b.div * 100) + '% → ' + (b.div > 0.4 ? '20%' : '70%'), sub: 'скільки прибутку забирати собі', f: function () { b.div = b.div > 0.4 ? 0.2 : 0.7; return 'Тепер забираєш ' + Math.round(b.div * 100) + '% вільного прибутку.'; } });
-  o.push({ t: 'Продати за ~' + fmt(bizValue(s, b)), f: function () { var v = bizValue(s, b) * rnd(0.85, 1.15); closeBiz(s, b, 'продано', v); mark(s, 'Прода' + g(s, 'в', 'ла') + ' «' + b.name + '»'); return 'Ти прода' + g(s, 'в', 'ла') + ' «' + b.name + '» за ' + fmt(v) + '.'; } });
-  o.push({ t: 'Ліквідувати бізнес', sub: 'розпродати майно (~' + fmt(b.cap * 0.25 + b.cash) + ') і закрити назавжди', f: function () { var v = b.cap * 0.25 + b.cash; closeBiz(s, b, 'закрито', v); return '«' + b.name + '» ліквідовано.'; } });
-  return { title: b.name, text: 'Рік роботи: ' + b.yrs + '. Підготовка: ' + bizReadyLabel(bizQ(s, b)) + '. Працівників: ' + (b.staff || 0) + (b.points > 1 ? ', точок: ' + b.points : '') + (b.fran != null ? ', франчайзі: ' + b.fran : '') + (b.share < 1 ? ', твоя частка ' + Math.round(b.share * 100) + '%' : '') + '. Минулий рік: ' + fmt(b.last) + '. Ти отрима' + g(s, 'в', 'ла') + ' з нього дивідендів: ' + fmt(b.paid) + '.', opts: o };
-}
 
 // ---- Переїзд ----
 A({ id: 'tocity', tab: 'move', n: 'Переїхати в місто', d: 'Більше роботи, дорожче життя', show: function (s) { return !s.urban && s.age >= 16; },
@@ -283,7 +255,7 @@ function emigrate(s, code, how) {
   if (s.partner && !s.partner.married) { s.partner = null; s.exes++; }
   add(s, { happy: -6 });
   mark(s, 'Переїзд: ' + from.name + ' → ' + COUNTRIES[code].name);
-  return 'Ти ' + g(s, 'переїхав', 'переїхала') + ' до ' + COUNTRIES[code].name + ' ' + COUNTRIES[code].flag + ' (' + how + '). Статус: ' + STATUS_N[resStatus(s)] + '.' + (resStatus(s) === 'illegal' ? ' Офіційно працювати не можна.' : ' Нова мова, нові правила, нове життя.');
+  return 'Ти ' + g(s, 'переїхав', 'переїхала') + ' до ' + genC(COUNTRIES[code]) + ' ' + COUNTRIES[code].flag + ' (' + how + '). Статус: ' + STATUS_N[resStatus(s)] + '.' + (resStatus(s) === 'illegal' ? ' Офіційно працювати не можна.' : ' Нова мова, нові правила, нове життя.');
 }
 A({ id: 'emigrate', tab: 'move', n: 'Емігрувати', d: 'Робоча віза, навчання, біженство, лотерея', show: function (s) { return s.age >= 17; },
   run: function (s) {
@@ -295,9 +267,9 @@ A({ id: 'emigrate', tab: 'move', n: 'Емігрувати', d: 'Робоча в�
       var studyP = s.age <= 30 && s.edu >= 3 && code !== 'SA' ? clamp(open * 0.8 * (s.gpa / 100) * (0.3 + lang), 0.02, 0.8) : 0;
       var ref = cf(s) === 2 && ['PL', 'DE', 'CA', 'SE', 'FR', 'ES', 'IT', 'GB'].indexOf(code) >= 0 ? (['PL', 'DE'].indexOf(code) >= 0 ? 0.85 : 0.5) : 0;
       if (work) o.push({ t: d.flag + ' ' + d.name + ' — робоча віза', sub: 'шанс ' + Math.round(work * 100) + '% · мова: ' + LANG_NAMES[d.lang] + ' ' + Math.round(langLevel(s, d.lang)) + (d.engOk && d.lang !== 'en' ? ' (вистачить і англійської)' : '') + ' · медіана ' + fmt(d.median), dis: s.money < cost,
-        f: function () { s.money -= cost; if (chance(work)) return emigrate(s, code, 'робоча віза'); return 'Візу до ' + d.name + ' не дали.'; } });
+        f: function () { s.money -= cost; if (chance(work)) return emigrate(s, code, 'робоча віза'); return 'Візу до ' + genC(d) + ' не дали.'; } });
       if (studyP) { var fee = d.fee * d.median * 1.5 + d.median * 0.3; o.push({ t: d.flag + ' ' + d.name + ' — навчання', sub: 'шанс ' + Math.round(studyP * 100) + '% · перший рік ~' + fmt(fee), dis: s.money < fee,
-        f: function () { if (!chance(studyP)) return 'Університет у ' + d.name + ' відмовив.'; s.money -= fee; var r = emigrate(s, code, 'студентська віза'); return { title: 'Спеціальність', text: r + ' Обери, що вивчати.', opts: uniOpts(s) }; } }); }
+        f: function () { if (!chance(studyP)) return 'Університет ' + inC(d) + ' відмовив.'; s.money -= fee; var r = emigrate(s, code, 'студентська віза'); return { title: 'Спеціальність', text: r + ' Обери, що вивчати.', opts: uniOpts(s) }; } }); }
       if (ref) o.push({ t: d.flag + ' ' + d.name + ' — як біженець', sub: 'шанс ' + Math.round(ref * 100) + '% · через війну вдома', f: function () { if (chance(ref)) return emigrate(s, code, 'тимчасовий захист'); return 'Виїхати не вдалося.'; } });
       if (code === 'US' && !s.used.dv) o.push({ t: '🇺🇸 Лотерея грін-карт', sub: 'шанс ~1%, безкоштовно', f: function () { s.used.dv = 1; if (chance(0.012) && s.edu >= 3) return emigrate(s, 'US', 'виграш у лотерею грін-карт'); return 'У лотерею цього року не пощастило.'; } });
     });
@@ -309,7 +281,7 @@ A({ id: 'emigrate', tab: 'move', n: 'Емігрувати', d: 'Робоча в�
     });
     var off = yearly(s, 'emig', function () { return wsample(o, 4, function (x) { return /біженець/.test(x.t) ? 5 : /просто переїхати/.test(x.t) ? 0.5 : /Лотерея/.test(x.t) ? 0.7 : 1; }).map(function (x) { return x.t; }); });
     o = o.filter(function (x) { return off.v.indexOf(x.t) >= 0; });
-    (s.citizen || []).filter(function (x) { return x !== s.country && x !== s.birth; }).forEach(function (x) { o.unshift({ t: COUNTRIES[x].flag + ' Переїхати до ' + COUNTRIES[x].name, sub: 'ти громадянин — без віз', f: function () { return emigrate(s, x, 'повернення'); } }); });
+    (s.citizen || []).filter(function (x) { return x !== s.country && x !== s.birth; }).forEach(function (x) { o.unshift({ t: COUNTRIES[x].flag + ' Переїхати до ' + genC(COUNTRIES[x]), sub: 'ти громадянин — без віз', f: function () { return emigrate(s, x, 'повернення'); } }); });
     if (s.immigrant && isCitizen(s, s.birth)) o.unshift({ t: COUNTRIES[s.birth].flag + ' Повернутися додому', sub: COUNTRIES[s.birth].name, f: function () { return emigrate(s, s.birth, 'повернення'); } });
     return { title: 'Шанси на переїзд цього року', text: 'Тобі трапилися такі варіанти; інші можуть зʼявитися наступного року. Шанс залежить від освіти, мови країни, досвіду й відкритості. Після переїзду платять менше, поки не вивчиш мову і не адаптуєшся; мова підтягується сама, якщо живеш там.', opts: o.length ? o : [{ t: 'Немає варіантів', sub: 'потрібна освіта від коледжу або вік до 30 для навчання', f: function () { return 'Поки варіантів немає.'; } }] };
   } });
@@ -398,15 +370,7 @@ A({ id: 'join_gang', tab: 'risk', n: 'Вступити в угруповання
     return 'Ти тепер ' + rankName(s.gang).toLowerCase() + ' в ' + (s.gang.kind === 'картель' ? 'картелі' : 'мафіозній сімʼї') + '. Шляху назад може не бути.';
   } });
 A({ id: 'job_gang', tab: 'risk', n: 'Взяти справу від угруповання', d: 'Вибір: перевезення, борги чи охорона', show: function (s) { return !!s.gang; },
-  run: function (s) {
-    var g2 = s.gang;
-    function done(perf, pay, heat, harm, txt) { g2.perf = clamp(g2.perf + perf); g2.heat = (g2.heat || 0) + heat; s.shadow = (s.shadow || 0) + M(s) * pay; if (harm && chance(harm)) { add(s, { health: -20 }); return txt + ' Але тебе поранило.'; } return txt + ' (+' + fmt(M(s) * pay) + ')'; }
-    return { title: 'Справа', text: 'Бос дає вибір, що взяти цього року.', opts: [
-      { t: 'Перевезти партію', sub: 'менше насильства, більше уваги поліції', f: function () { if (chance(riskP(s, 0.12))) return court(s, 'перевезення заборонених речовин', 3, 8); return done(10, rnd(1, 3) * (NARCO.indexOf(s.country) >= 0 ? 2 : 1), 2, 0, 'Партія дійшла.'); } },
-      { t: 'Вибити борг', sub: 'спорт допомагає, можна постраждати', f: function () { var r = R(); if (r < 0.2 - s.sk.sport / 500) { add(s, { health: -15 }); g2.perf -= 5; return 'Боржник виявився не сам. Ти ледве вибра' + g(s, 'вся', 'лася') + '.'; } if (r < 0.3) return court(s, 'вимагання', 2, 5); return done(12, rnd(0.5, 1.5), 1, 0.05, 'Борг повернуто.'); } },
-      { t: 'Охороняти точку', sub: 'нудно, мало грошей, мало ризику', f: function () { return done(4, rnd(0.3, 0.8), 0.5, 0.03, 'Спокійний рік на точці.'); } },
-      { t: 'Відмовитися цього разу', sub: 'бос запамʼятає', f: function () { g2.perf -= 12; return 'Бос нічого не сказав. Але подивився довго.'; } }] };
-  } });
+  run: function (s) { return gangJob(s); } });
 A({ id: 'bribe', tab: 'risk', n: 'Платити поліції', d: function (s) { return 'Ризик арешту ↓ на рік · ' + fmt(M(s) * (1 + s.gang.rank * 3)); }, show: function (s) { return !!s.gang && C(s).law < 0.8; },
   run: function (s) { var cost = M(s) * (1 + s.gang.rank * 3); s.money -= cost; if (chance(C(s).law * 0.3)) return busted2(s); return 'Потрібні люди отримали конверти.'; } });
 A({ id: 'lowkey', tab: 'risk', n: 'Залягти на дно', d: 'Менше доходу, менше ризику, розшук спадає', show: function (s) { return !!s.gang; },

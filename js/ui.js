@@ -54,7 +54,12 @@
         if (useId) S.used[useId] = 1;   // раз на рік зараховується лише тоді, коли щось обрано
         var r = o.f(); normMoney(S);
         if (r && typeof r === 'object') { prompt(r, done, closable); return; }
-        if (r) { say(S, r, 'me'); toast(r); }
+        if (r) {
+          // короткий результат без контексту — додати, про що була подія і що ти обрав
+          var ctx = '';
+          if (r.length < 70 && p.text) { var fs = String(p.text).replace(/⟦[^⟧]*⟧/g, function (m) { return m; }).split(/(?<=[.!?])\s/)[0]; if (fs.length > 80) fs = fs.slice(0, 77) + '…'; ctx = fs + ' → ' + o.t + '. '; }
+          say(S, ctx + r, 'me'); toast(r);
+        }
         S._snap = null;
         closeModal(); render(); save(); if (done) done();
       } };
@@ -156,7 +161,8 @@
     $('hSub').textContent = yrs(S.age) + ' · ' + S.year + ' · ' + c.name + (S.urban ? ', місто' : ', село') + ' · ' + jobTitle(S);
     $('hMoney').textContent = money(S.debt > 0 ? S.debt : S.money);
     $('hMoneyL').textContent = S.debt > 0 ? 'Борг' : 'Готівка';
-    $('hNet').textContent = money(netWorth(S));
+    var nw = netWorth(S), same = Math.abs(nw - (S.money - S.debt)) < Math.max(1, Math.abs(nw) * 0.01);
+    $('hNet').textContent = money(nw); $('hNet').parentNode.style.display = same && (S.debt > 0 || nw === S.money) ? 'none' : '';
     $('bars').innerHTML = bar('Здоровʼя', S.st.health, 'health') + bar('Щастя', S.st.happy, 'happy') + bar('Розум', S.st.smarts, 'smarts') + bar('Харизма', S.st.social, 'social');
     renderLog(); renderTabs(); renderActs(); renderProfile();
   }
@@ -380,12 +386,12 @@
     var h = '<div class="end-inner"><p class="eyebrow">' + c.flag + ' ' + c.name + ' · ' + S.birthYear + '–' + S.year + '</p>' +
       '<h1>' + esc(S.first + ' ' + S.last) + (S.left ? ': гру завершено у ' + yrs(S.age) : ' ' + g(S, 'прожив', 'прожила') + ' ' + yrs(S.age)) + '</h1><p class="cause">' + (S.left ? 'Ти ' + g(S, 'вирішив', 'вирішила') + ' більше не грати за цю людину. Ось підсумок того, що встигло статися.' : 'Причина смерті: ' + esc(S.cause) + '.') + '</p>' +
       '<div class="cmp">' +
-      (S.left ? '' : st(pct(sm.pctCountry), 'людей, народжених у ' + c.name + ', помирають раніше') +
+      (S.left ? '' : st(pct(sm.pctCountry), 'людей, народжених ' + inC(c) + ', помирають раніше') +
       st(pct(sm.pctWorld), 'людей у світі помирають раніше')) +
       st(pct(sm.peakPct), 'людей у світі заробляють менше, ніж ти на піку (' + fmt(sm.peakInc) + '/рік)') +
       st(fmt(sm.peakNet), 'найбільший статок') +
-      (S.left ? '' : st((S.age >= c.le ? '+' : '') + Math.round(S.age - c.le) + ' р.', 'проти середньої тривалості життя в ' + c.name + ' (' + c.le + ' р.)')) +
-      (sm.peakInc > 0 ? st('×' + (sm.peakInc / c.median).toFixed(1).replace('.', ','), 'від медіанного доходу країни — твій найкращий рік') : '') + '</div>' +
+      (S.left ? '' : st((S.age >= c.le ? '+' : '') + Math.round(S.age - c.le) + ' р.', 'проти середньої тривалості життя ' + inC(c) + ' (' + c.le + ' р.)')) +
+      (sm.peakInc > 0 ? (function () { var ce = C(S); return st('×' + (sm.peakInc / ce.median).toFixed(1).replace('.', ','), 'від медіанного доходу ' + genC(ce) + ' — твій найкращий рік'); })() : '') + '</div>' +
       '<p class="epi">' + esc(epitaph(S)) + '</p>' +
       (S.age >= 25 ? '<p class="mob">' + esc(mobilityText(S, lifeDecile(S))) + '</p>' : '') +
       '<div class="kv"><span>Мрія</span><span>' + ((S.dreamsDone || []).length ? 'здійснено: ' + S.dreamsDone.map(function (k) { return DREAMS[k].n.toLowerCase(); }).join(', ') + (S.dream ? ' · не встиг' + g(S, '', 'ла') + ': ' + DREAMS[S.dream].n.toLowerCase() : '') : S.dream ? 'не здійснилася — ' + DREAMS[S.dream].n.toLowerCase() : 'не ма' + g(S, 'в', 'ла')) + '</span></div>' +
