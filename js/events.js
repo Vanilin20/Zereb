@@ -74,9 +74,11 @@ ev('roommate', [17, 23], 2, function (s) { return s.study && s.study.t !== 'scho
     O('Зняти житло', function () { s.money -= M(s) * 0.15; add(s, { gpa: 4 }); return 'Окреме житло — дорожче, зате тиша.'; })] };
 });
 ev('cofounder', [20, 40], 2, function (s) { return s.money > M(s) * 0.3; }, function (s) {
-  var f = nameFrom(s.country, chance(.5) ? 'm' : 'f');
-  return { text: 'Друг ' + f + ' кличе тебе співзасновником стартапу. Потрібно вкласти ' + fmt(M(s) * 0.3) + '.', opts: [
-    O('Увійти в справу', function () { s.money -= M(s) * 0.3; var r = R(); if (r < 0.6) { add(s, { biz: 8, happy: -5 }); return 'Стартап закрився за рік. Гроші втрачено, але досвід є.'; } if (r < 0.9) { s.money += M(s) * 0.5; add(s, { biz: 10 }); return 'Стартап продали невеликій компанії — ти в плюсі.'; } var v = M(s) * rnd(5, 40); s.money += v; mark(s, 'Успішний стартап'); return 'Стартап вистрілив! Твоя частка — ' + fmt(v) + '.'; }, 'ризиковано'),
+  var f = nameFrom(s.country, chance(.5) ? 'm' : 'f'), lv = pick([['уже продав один проєкт', 0.75], ['кинув роботу в корпорації, горить ідеєю', 0.45], ['це вже його четвертий «геніальний» стартап', 0.2]]);
+  var know = s.sk.biz / 200 + (s.fields.indexOf('it') >= 0 || s.fields.indexOf('biz') >= 0 ? 0.1 : 0);
+  return { text: f + ' кличе тебе співзасновником стартапу, потрібно вкласти ' + fmt(M(s) * 0.3) + '. Про нього: ' + lv[0] + '.', opts: [
+    O('Увійти в справу', function () { s.money -= M(s) * 0.3; var p = lv[1] * 0.6 + know; add(s, { biz: 8 }); if (!chance(p)) { add(s, { happy: -5 }); return 'Стартап закрився за рік: ' + (lv[1] < 0.3 ? 'знову «не пішло».' : know < 0.15 ? 'ні ти, ні він не розумілися на продажах.' : 'ринок виявився меншим, ніж здавалося.') + ' Гроші втрачено, досвід лишився.'; } if (!chance(0.15 + know)) { s.money += M(s) * 0.6; return 'Стартап купила невелика компанія — ти в плюсі.'; } var v = M(s) * rnd(5, 30); s.money += v; mark(s, 'Успішний стартап'); return 'Стартап вистрілив! Твоя частка — ' + fmt(v) + '.'; }, know >= 0.2 ? 'ти розумієшся на справі' : 'досвіду в бізнесі в тебе небагато'),
+    O('Допомагати порадами, без грошей', function () { add(s, { biz: 3 }); return 'Ти лишаєшся поруч як порадник. Без ризику — і без частки.'; }),
     O('Відмовитися', function () { return 'Ти відмови' + g(s, 'вся', 'лася') + '.'; })] };
 });
 ev('witness', [20, 40], 2, function (s) { return s.friends > 0; }, function (s) { s.money -= M(s) * 0.05; add(s, { social: 4, happy: 5 }); return 'Ти ' + g(s, 'був свідком', 'була свідкою') + ' на весіллі найкращого друга.'; });
@@ -123,12 +125,13 @@ ev('midlife', [40, 52], 3, null, function (s) {
     O('Просто пережити', function () { add(s, { happy: -3 }); return 'Минуло.'; })] };
 }, true);
 ev('parentill', [25, 70], 3, function (s) { return s.parents.some(function (p) { return p.alive && p.age > 55 && !p.ill; }); }, function (s) {
-  var p = pick(s.parents.filter(function (x) { return x.alive && x.age > 55; })); var cost = treatCost(s, 0.7);
+  var p = pick(s.parents.filter(function (x) { return x.alive && x.age > 55; })), c = C(s), cost = treatCost(s, 0.7), early = chance(0.5);
   p.ill = true;
-  return { text: p.role + ' тяжко захворі' + (p.sex === 'f' ? 'ла' : 'в') + '. Лікування коштує ' + fmt(cost) + '.', opts: [
-    O('Оплатити лікування', function () { if (s.money >= cost) s.money -= cost; else { addDebt(s, cost - s.money, 'лікування батьків'); s.money = 0; } if (chance(.7)) p.ill = false; p.rel += 15; return 'Ти оплати' + g(s, 'в', 'ла') + ' лікування. ' + (p.ill ? 'Але стан важкий.' : p.role + ' одужує.'); }),
-    O('Доглядати самому', function () { add(s, { happy: -6 }); if (s.job) s.job.perf -= 10; p.rel += 10; if (chance(.4)) p.ill = false; return 'Ти доглядаєш ' + (p.sex === 'f' ? 'маму' : 'тата') + ' сам' + g(s, '', 'а') + '.'; }),
-    O('Не можу допомогти', function () { add(s, { happy: -8 }); return 'Тобі нічим допомогти.'; })] };
+  var cure = (early ? 0.8 : 0.45) * (0.6 + c.hq * 0.5);
+  return { text: p.role + ' тяжко захворі' + (p.sex === 'f' ? 'ла' : 'в') + (early ? ' — лікарі кажуть, що виявили рано.' : ' — хворобу виявили пізно.') + ' Лікування: ' + fmt(cost) + (c.health === 'free' ? ', але державне — безкоштовне, лише черги.' : '.'), opts: [
+    O('Оплатити найкраще лікування', function () { if (s.money >= cost) s.money -= cost; else { addDebt(s, cost - s.money, 'лікування батьків'); s.money = 0; } if (chance(clamp(cure + 0.15, 0, 0.95))) p.ill = false; p.rel += 15; return 'Ти оплати' + g(s, 'в', 'ла') + ' лікування. ' + (p.ill ? 'Але ' + (early ? 'не пощастило — стан важкий.' : 'хворобу запустили надто давно.') : p.role + ' одужує.'); }, s.money >= cost ? 'з заощаджень' : 'доведеться в борг'),
+    O('Державна лікарня й догляд вдома', function () { add(s, { happy: -6 }); if (s.job) s.job.perf -= 8; p.rel += 10; if (chance(cure * 0.8)) p.ill = false; return (p.ill ? 'Лікування затягується.' : p.role + ' видужує.') + ' Ти ' + g(s, 'сам', 'сама') + ' доглядаєш.'; }, 'якість медицини тут ' + (c.hq > 0.75 ? 'хороша' : c.hq > 0.5 ? 'середня' : 'слабка')),
+    O('Не можу допомогти', function () { add(s, { happy: -8 }); p.rel -= 15; return 'Тобі нічим допомогти. ' + p.role + ' це запамʼятає.'; })] };
 });
 ev('kidtrouble', [30, 70], 3, function (s) { return s.kids.some(function (k) { return k.alive && k.age >= 12 && k.age <= 17; }); }, function (s) {
   var k = pick(s.kids.filter(function (x) { return x.alive && x.age >= 12 && x.age <= 17; }));
@@ -209,8 +212,10 @@ ev('garden', [60, 100], 2, null, function (s) { add(s, { happy: 5, health: 2 });
 function onJob(ids) { return function (s) { return s.job && !s.job.teen && ids.indexOf(s.job.id) >= 0; }; }
 function perf(s, d) { if (s.job) s.job.perf = clamp(s.job.perf + d); }
 ev('strike', [18, 70], 3, onJob(UNION_JOBS), function (s) {
-  return { text: 'Профспілка оголошує страйк: вимагають підвищення зарплат і кращих умов.', opts: [
-    O('Страйкувати разом з усіма', function () { if (!s.job) return 'Вже неактуально.'; var r = R(); if (r < 0.55) { s.job.bonus = (s.job.bonus || 1) * 1.1; add(s, { happy: 5, social: 3 }); return 'Страйк переміг: зарплату підняли на 10%.'; } if (r < 0.7) { endJob(s, 'страйк'); add(s, { happy: -8 }); return 'Керівництво звільнило активістів, і тебе теж.'; } add(s, { happy: -2 }); return 'Страйк нічого не дав, але ти бу' + g(s, 'в', 'ла') + ' зі своїми.'; }),
+  // успіх страйку залежить від країни: сильні профспілки, закон, безробіття
+  var c = C(s), power = clamp(c.law * 0.7 + (0.12 - c.unemp) * 2 + (s.econ < 0 ? -0.15 : 0.05), 0.1, 0.85);
+  return { text: 'Профспілка оголошує страйк: вимагають підвищення зарплат.' + (power > 0.6 ? ' Тут профспілки сильні.' : power < 0.35 ? ' Тут страйкарів легко замінити: безробіття ' + Math.round(c.unemp * 100) + '%.' : ''), opts: [
+    O('Страйкувати разом з усіма', function () { if (!s.job) return 'Вже неактуально.'; if (chance(power)) { s.job.bonus = (s.job.bonus || 1) * 1.1; add(s, { happy: 5, social: 3 }); return 'Страйк переміг: зарплату підняли на 10%.'; } if (chance(0.5 - power / 2)) { endJob(s, 'страйк'); add(s, { happy: -8 }); return 'Керівництво звільнило активістів, і тебе теж.'; } add(s, { happy: -2 }); return 'Страйк нічого не дав, але ти бу' + g(s, 'в', 'ла') + ' зі своїми.'; }),
     O('Вийти на роботу', function () { perf(s, 8); s.friends = Math.max(0, s.friends - 1); add(s, { social: -4 }); return 'Колеги тепер дивляться косо, зате начальство помітило.'; })] };
 });
 ev('dev_legacy', [20, 65], 3, onJob(['dev', 'gamedev', 'sysadmin', 'datasci']), function (s) {
@@ -306,9 +311,11 @@ ev('unexp', [18, 95], 6, function (s) { return !s.withParents; }, function (s) {
   var cost = M(s) * x[1] * rnd(0.7, 1.4); s.money -= cost; return 'Непередбачені витрати: ' + x[0] + ' — ' + fmt(cost) + '.';
 });
 ev('rentup', [18, 70], 2, function (s) { return !s.home && !s.withParents && s.urban; }, function (s) {
-  return { text: 'Власник квартири піднімає оренду на 15%.', opts: [
+  var c = C(s), hot = c.gdp > 30 || s.econ > 0;
+  return { text: 'Власник квартири піднімає оренду на 15%.' + (hot ? ' Ринок гарячий: вільних квартир мало.' : ' Вільних квартир на ринку вистачає.'), opts: [
+    O('Торгуватися', function () { if (chance(0.25 + s.st.social / 250 + (hot ? 0 : 0.25))) return 'Власник погодився на +5%: краще надійний орендар, ніж пошуки нового.'; s.money -= M(s) * 0.03; return 'Власник не поступився.'; }, hot ? 'у власника позиція сильніша' : 'у тебе є куди піти — це аргумент'),
     O('Платити', function () { s.money -= M(s) * 0.03; return 'Довелося платити більше.'; }),
-    O('Шукати дешевше житло', function () { s.money -= M(s) * 0.02; add(s, { happy: -4 }); return 'Переїзд забрав сили, але нове житло дешевше.'; })] };
+    O('Шукати дешевше житло', function () { s.money -= M(s) * 0.015; add(s, { happy: -4 }); if (hot && chance(0.5)) { s.money -= M(s) * 0.02; return 'Дешевшого нічого не знайшлося — переплати' + g(s, 'в', 'ла') + ' ріелтору і живеш далі від роботи.'; } return 'Переїзд забрав сили, але нове житло дешевше.'; })] };
 });
 ev('firstpay', [16, 30], 8, function (s) { return s.job && !s.job.teen && s.job.yrs === 1 && !s.flags.firstPay; }, function (s) {
   s.flags.firstPay = 1; var p = jobPay(s), c = C(s);
@@ -368,18 +375,21 @@ ev('bully', [7, 15], 3, function (s) { return !!s.study; }, function (s) {
     O('Мовчки платити', function () { s.money -= M(s) * 0.005; add(s, { happy: -6 }); return 'Рік ти віддава' + g(s, 'в', 'ла') + ' гроші на обід.'; })] };
 });
 ev('crypto', [18, 55], 1.2, function (s) { return s.money > M(s) * 0.1; }, function (s) {
-  var coin = pick(['$FROG', '$MOON', 'NeuroCoin', 'MetaKitty', '$WAGMI']), r = R();
-  return { text: 'Знайомий клянеться, що ' + coin + ' «точно зробить х20». Він уже заробив — показує скріншоти.', opts: [
-    O('Вкласти 20% заощаджень', function () { var a = s.money * 0.2; s.money -= a; if (r < 0.6) return coin + ' обвалився на 95%. −' + fmt(a) + '.'; if (r < 0.88) { s.money += a * rnd(0.6, 1.6); return coin + ' погойдався — ти вийш' + g(s, 'ов', 'ла') + ' майже при своїх.'; } var w = a * rnd(4, 20); s.money += w; mark(s, 'Розбагаті' + g(s, 'в', 'ла') + ' на ' + coin); return coin + ' злетів! +' + fmt(w) + '.'; }),
-    O('Вкласти трохи, 3%', function () { var a = s.money * 0.03; s.money -= a; if (r < 0.6) return 'Втрачено ' + fmt(a) + '. Добре, що небагато.'; if (r < 0.88) { s.money += a; return 'Вийш' + g(s, 'ов', 'ла') + ' в нуль.'; } s.money += a * 10; return 'Злетів! Але від 3%… +' + fmt(a * 9) + '. Шкода, що не більше.'; }),
-    O('Не вʼязуватися', function () { if (r >= 0.88) { add(s, { happy: -4 }); return coin + ' справді злетів у 15 разів. Знайомий тепер на новому авто.'; } return 'Через місяць ' + coin + ' зник разом із сайтом. Знайомий більше не хвалиться.'; })] };
+  // мемкоїни — лотерея; але гравець бачить ознаки, і грамотність допомагає не потрапити на скам
+  var coin = pick(['$FROG', '$MOON', 'NeuroCoin', 'MetaKitty', '$WAGMI']), scam = chance(0.5), lit = s.st.smarts / 100 + s.sk.code / 200;
+  var hint = scam ? (chance(lit) ? ' Ти помічаєш: у коїна немає жодного коду в відкритому доступі, а автори анонімні.' : '') : (chance(lit) ? ' Ти перевіри' + g(s, 'в', 'ла') + ': проєкт реальний, але волатильність шалена.' : '');
+  return { text: 'Знайомий клянеться, що ' + coin + ' «точно зробить х20». Показує скріншоти прибутку.' + hint, opts: [
+    O('Вкласти 20% заощаджень', function () { var a = s.money * 0.2; s.money -= a; if (scam) return coin + ' виявився скамом: автори зникли з грошима. −' + fmt(a) + '.'; var r = R(); if (r < 0.45) return coin + ' обвалився на 90%. −' + fmt(a * 0.9) + '.' + (s.money += a * 0.1, ''); if (r < 0.85) { s.money += a * rnd(0.6, 1.6); return coin + ' погойдався — ти вийш' + g(s, 'ов', 'ла') + ' майже при своїх.'; } var w = a * rnd(4, 20); s.money += w; mark(s, 'Розбагаті' + g(s, 'в', 'ла') + ' на ' + coin); return coin + ' злетів! +' + fmt(w) + '.'; }),
+    O('Вкласти трохи, 3%', function () { var a = s.money * 0.03; s.money -= a; if (scam || chance(0.45)) return 'Втрачено ' + fmt(a) + '. Добре, що небагато.'; if (chance(0.7)) { s.money += a; return 'Вийш' + g(s, 'ов', 'ла') + ' в нуль.'; } s.money += a * 10; return 'Злетів! Але від 3%… +' + fmt(a * 9) + '.'; }),
+    O('Не вʼязуватися', function () { if (!scam && chance(0.15)) { add(s, { happy: -4 }); return coin + ' справді злетів у 15 разів. Знайомий тепер на новому авто.'; } return scam ? 'Через місяць ' + coin + ' зник разом із сайтом.' : coin + ' то ріс, то падав. Знайомий тепер мовчить про нього.'; })] };
 });
 ev('friendloan', [20, 70], 2, function (s) { return s.money > M(s) * 0.2 && s.friends > 0; }, function (s) {
-  var a = M(s) * 0.15, rel = R();
-  return { text: 'Близький друг просить позичити ' + fmt(a) + ': «Віддам за пів року, чесно».', opts: [
-    O('Позичити всю суму', function () { s.money -= a; if (rel < 0.55) { s.money += a; add(s, { social: 3 }); return 'Друг повернув усе вчасно. Дружба міцнішає.'; } if (rel < 0.8) { s.money += a * 0.5; return 'Друг повернув половину і зник.'; } s.friends--; return 'Гроші не повернулися. Друга теж більше не бачиш.'; }),
-    O('Дати половину', function () { s.money -= a / 2; if (rel < 0.8) { s.money += a / 2; return 'Друг повернув. Але трохи образився, що не довіряєш.'; } return 'Половина пропала. Добре, що не вся.'; }),
-    O('Відмовити', function () { if (rel < 0.55 && chance(0.6)) { s.friends--; add(s, { happy: -3 }); return 'Друг образився — ви віддалилися.'; } return 'Друг зрозумів. Чи зробив вигляд.'; })] };
+  // надійність друга видно з того, що ти про нього знаєш
+  var a = M(s) * 0.15, kind = pick([['завжди віддає вчасно — ви знайомі ще зі школи', 0.9], ['хороша людина, але з грошима в нього вічно безлад', 0.55], ['вже винен кільком спільним знайомим', 0.2]]), ok = kind[1];
+  return { text: 'Друг просить позичити ' + fmt(a) + ': «Віддам за пів року, чесно». Що ти про нього знаєш: ' + kind[0] + '.', opts: [
+    O('Позичити всю суму', function () { s.money -= a; if (chance(ok)) { s.money += a; add(s, { social: 3 }); return 'Друг повернув усе вчасно. Дружба міцнішає.'; } if (chance(0.4)) { s.money += a * 0.5; return 'Друг повернув половину і почав уникати зустрічей.'; } s.friends--; return 'Гроші не повернулися. Друга теж більше не бачиш.'; }),
+    O('Дати половину', function () { s.money -= a / 2; if (chance(ok + 0.15)) { s.money += a / 2; return 'Друг повернув. Трохи образився, що не довіряєш.'; } return 'Половина пропала. Добре, що не вся.'; }),
+    O('Відмовити', function () { if (ok > 0.8 && chance(0.6)) { s.friends--; add(s, { happy: -3 }); return 'Він ніколи тебе не підводив — і образився, що ти не повірив' + g(s, '', 'ла') + '.'; } return ok < 0.3 ? 'Через місяць він позичив у когось іншого — і не віддав.' : 'Друг зрозумів. Чи зробив вигляд.'; })] };
 });
 ev('boss', [18, 65], 2, function (s) { return s.job && !s.job.teen && s.job.lvl < 3; }, function (s) {
   var c = C(s);
@@ -509,10 +519,10 @@ ev('permit', [18, 70], 5, function (s) { return s.immigrant && s.immYrs <= 6 && 
     O('Робити самостійно', function () { if (chance(0.25 + workLang(s, s.country) * 0.5)) { add(s, { happy: -3 }); return 'Три візити, купа довідок — і дозвіл є.'; } s.money -= M(s) * 0.15; add(s, { happy: -8 }); if (s.job && chance(0.3)) { endJob(s, 'документи'); return 'Через помилку в документах дозвіл затримали, і роботодавець тебе звільнив.'; } return 'Через помилку в документах довелося платити штраф і подаватися знову.'; }, 'краще знати мову')] };
 });
 ev('envelope', [18, 90], 3, function (s) { return C(s).law < 0.55 && (s.flags.ill || s.parents.some(function (p) { return p.ill; })); }, function (s) {
-  var e = M(s) * 0.05;
-  return { text: 'Лікар натякає, що «з подякою» лікування буде кращим і швидшим.', opts: [
-    O('Дати конверт ' + fmt(e), function () { s.money -= e; if (chance(0.75)) { s.st.health = clamp(s.st.health + 6); return 'Тебе поклали в кращу палату й лікують уважніше.'; } return 'Конверт узяли — нічого не змінилося.'; }),
-    O('Обійтися без цього', function () { if (chance(0.5)) return 'Лікували як усіх — нормально.'; add(s, { health: -3 }); return 'Черги, черги і ще раз черги.'; })] };
+  var c = C(s), e = M(s) * 0.05, helps = 0.3 + (1 - c.law) * 0.6;
+  return { text: 'Лікар натякає, що «з подякою» лікування буде кращим і швидшим.' + (c.hq < 0.5 ? ' Без цього тут справді лікують абияк.' : ''), opts: [
+    O('Дати конверт ' + fmt(e), function () { s.money -= e; if (chance(helps)) { s.st.health = clamp(s.st.health + 6); return 'Тебе поклали в кращу палату й лікують уважніше.'; } return 'Конверт узяли — нічого не змінилося.'; }),
+    O('Обійтися без цього', function () { if (chance(c.hq)) return 'Лікували як усіх — нормально.'; add(s, { health: -3 }); return 'Черги, черги і ще раз черги.'; })] };
 });
 ev('whistle', [25, 65], 1.5, function (s) { return s.job && !s.job.teen && s.job.lvl >= 1; }, function (s) {
   return { text: 'Ти поміти' + g(s, 'в', 'ла') + ', що керівництво підробляє звіти й обманює клієнтів.', opts: [
