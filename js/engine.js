@@ -152,6 +152,7 @@ function pension(s) { var c = C(s); return c.median * c.pens * (0.6 + Math.min(4
 function netWorth(s) {
   var w = s.money + s.inv.dep + s.inv.stk + s.inv.cry - s.debt;
   if (s.home) w += s.home.val;
+  if (s.mort) w -= s.mort.left;
   s.rentals.forEach(function (r) { w += r.val; });
   s.biz.forEach(function (b) { w += bizValue(s, b); });
   return w;
@@ -567,9 +568,7 @@ function familyTick(s) {
     say(s, 'У тебе ' + (sx === 'm' ? 'народився братик' : 'народилася сестричка') + ' — ' + s.sibs[s.sibs.length - 1].name + '.', 'good');
   }
   s.sibs.forEach(function (b) { if (!b.alive) return; b.age++; if (chance(hazard(bc, b.age))) { b.alive = false; add(s, { happy: -12 }); say(s, 'Помер' + gp(b, '', 'ла') + ' ' + gp(b, 'брат', 'сестра') + ' ' + b.name + '.', 'bad'); } });
-  if (s.withParents && s.age >= 18 && ((s.partner && s.partner.married) || (s.age >= 23 && s.lastInc > c.median * 0.7 && chance(0.2)))) {
-    s.withParents = false; say(s, 'Ти ' + g(s, 'переїхав', 'переїхала') + ' від батьків у власне житло (оренда).');
-  }
+  // зʼїхати від батьків — тепер рішення гравця (оголошення оренди), див. housing.js
   var p = s.partner;
   if (p) {
     p.age++; p.yrs++;
@@ -649,7 +648,7 @@ function finTick(s, ownerPay, side) {
     var LS = [0.75, 1, 1.7][s.ls];
     var extra = Math.max(0, inc + pshare - c.median * 1.2) * [0.6, 0.78, 0.95][s.ls];   // з доходом ростуть і витрати
     var food = (c.median * 0.76 * LS + extra) * (s.withParents ? 0.55 : 1) * [0.97, 1, 1.06][s.diet];
-    var housing = (!s.home && !s.withParents && !s.prison) ? c.median * 0.2 * (c.house / 9) * [0.8, 1, 1.6][s.ls] : 0;
+    var housing = rentCost(s);
     var kidsHome = s.kids.filter(function (k) { return k.alive && k.age < 18; }).length, kidsC = kidsHome * c.median * 0.13 * (pshare ? 0.6 : 1);
     var un = chance(0.35) ? c.median * rnd(0.03, 0.12) : 0; s.unexp = un;
     var mult = (s.prison ? 0.2 : 1) * (s.econ < 0 ? 1.06 : 1) * (pshare ? 0.85 : 1);
@@ -989,7 +988,7 @@ function creditTick(s, out) {
   var heavy = s.debt > Math.max(3 * Math.max(s.lastInc, 1), 2 * M(s));
   s.debtYrs = heavy ? (s.debtYrs || 0) + 1 : 0;
   if (s.debtYrs >= 2 && s.age >= 18 && !s.flags.bankrupt && !(s.debtAsk && s.age - s.debtAsk < 6) && (s.debtAsk = s.age)) out.push({ title: 'Борги душать', text: 'Борг ' + fmt(s.debt) + ' — це кілька твоїх річних доходів, і він росте через відсотки. Кредитний рейтинг: ' + Math.round(s.credit) + '.', opts: [
-    { t: 'Оголосити банкрутство', sub: 'частину боргу спишуть, майно продадуть, 7 років без кредитів', f: function () { var sold = 0; if (s.home) { sold += s.home.val; s.debt -= s.home.val; s.home = null; } s.rentals.forEach(function (r) { sold += r.val; s.debt -= r.val; }); s.rentals = []; if (sold) cashNote(s, 'Продаж майна при банкрутстві', sold); var before = Math.max(0, s.debt); s.debt = Math.max(0, s.debt * 0.2); cashNote(s, 'Списано боргу при банкрутстві', before - s.debt); if (s.debt <= 0 && s.money < 0) s.money = 0; s.credit = 5; s.flags.bankrupt = 7; s.debtYrs = 0; mark(s, 'Банкрутство'); add(s, { happy: -8 }); return 'Банкрутство оголошено. Борг зменшено до ' + fmt(s.debt) + '.'; } },
+    { t: 'Оголосити банкрутство', sub: 'частину боргу спишуть, майно продадуть, 7 років без кредитів', f: function () { var sold = 0; if (s.mort) { addDebt(s, s.mort.left, 'іпотека'); s.mort = null; } s.house = null; if (s.home) { sold += s.home.val; s.debt -= s.home.val; s.home = null; } s.rentals.forEach(function (r) { sold += r.val; s.debt -= r.val; }); s.rentals = []; if (sold) cashNote(s, 'Продаж майна при банкрутстві', sold); var before = Math.max(0, s.debt); s.debt = Math.max(0, s.debt * 0.2); cashNote(s, 'Списано боргу при банкрутстві', before - s.debt); if (s.debt <= 0 && s.money < 0) s.money = 0; s.credit = 5; s.flags.bankrupt = 7; s.debtYrs = 0; mark(s, 'Банкрутство'); add(s, { happy: -8 }); return 'Банкрутство оголошено. Борг зменшено до ' + fmt(s.debt) + '.'; } },
     { t: 'Платити далі', sub: 'стрес, але без мітки в історії', f: function () { add(s, { happy: -8, health: -3 }); s.debtYrs = 0; return 'Ти виріши' + g(s, 'в', 'ла') + ' розплачуватися сам' + g(s, '', 'а') + '.'; } }] });
 }
 function mentalTick(s) {

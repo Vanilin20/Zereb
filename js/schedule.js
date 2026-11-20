@@ -38,7 +38,7 @@ function freeHours(s) {
   if (s.chronic) h -= s.chronic.length * 2;   // лікарі, процедури, втома
   var small = s.kids.filter(function (k) { return k.alive && k.age < 12; }).length;
   h -= Math.min(24, small * 8) * (s.partner ? 0.6 : 1);
-  if (s.job || s.study) h -= s.own && s.own.car ? 3 : s.urban ? 7 : 5;
+  if (s.job || s.study) h -= commuteH(s);
   return Math.max(0, Math.round(h));
 }
 // Обовʼязки, яких не уникнути: допомога вдома в бідних родинах, догляд за хворими батьками
@@ -117,7 +117,7 @@ function hoursBreakdown(s) {
   if (s.pol) r.push(['політика', polHours(s)]);
   var ch = chores(s); if (ch) r.push([s.age < 18 ? 'допомога вдома' : 'догляд за батьками', ch]);
   var small = s.kids.filter(function (k) { return k.alive && k.age < 12; }).length; if (small) r.push(['малі діти', Math.round(Math.min(24, small * 8) * (s.partner ? 0.6 : 1))]);
-  if (s.job || s.study) r.push(['дорога', s.own && s.own.car ? 3 : s.urban ? 7 : 5]);
+  if ((s.job || s.study) && commuteH(s)) r.push(['дорога', commuteH(s)]);
   return r;
 }
 TABS.unshift({ id: 'sched', n: 'Розклад' });

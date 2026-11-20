@@ -315,7 +315,7 @@
     if (S.fame > 3) h += kv('Слава', Math.round(S.fame));
     h += '<h3>Гроші</h3>' + kv('Готівка', fmt(S.money)) + (S.debt ? kv('Борг', fmt(S.debt)) : '') +
       (S.inv.dep + S.inv.stk + S.inv.cry > 1 ? kv('Депозит / акції / крипта', fmt(S.inv.dep) + ' / ' + fmt(S.inv.stk) + ' / ' + fmt(S.inv.cry)) : '') +
-      (S.home ? kv(S.home.kind, fmt(S.home.val)) : '') + (S.rentals.length ? kv('Квартири в оренду', S.rentals.length) : '') +
+      kv('Житло', S.withParents ? 'з батьками' : S.house ? houseName(S.house) + (S.home ? ' · власне' : ' · оренда') : '—') + (S.house && S.house.type === 'rent' && !S.withParents ? kv('Оренда', fmt(rentCost(S)) + '/рік') : '') + (S.home ? kv('Вартість житла', fmt(S.home.val)) : '') + (S.mort ? kv('Іпотека', 'ще ' + fmt(S.mort.left) + ' · ' + fmt(S.mort.pay) + '/рік · ' + (S.mort.rate * 100).toFixed(1).replace('.', ',') + '%') : '') + ((S.job || S.study) ? kv('Дорога', commuteH(S) + ' год/тиж') : '') + (S.rentals.length ? kv('Квартири в оренду', S.rentals.length) : '') +
       (S.age >= 18 ? kv('Кредитний рейтинг', Math.round(S.credit) + (S.flags.bankrupt ? ' · банкрут' : '')) : '') +
       kv('Дохід за рік (чистий)', fmt(S.lastInc)) + (S.lastTax > 1 ? kv('Усі податки за рік', fmt(S.lastTax)) : '') + (S.age >= 18 ? kv('Дохід у світі', 'вище ніж у ' + pct(globalPct(S.lastInc)) + ' людей') : '') +
       kv('Родина', S.d + '-й дециль · ' + DEC_LBL[S.d - 1]) + kv('Медіанний дохід у країні', fmt(c.median)) + kv('Стиль життя', ['скромний', 'звичайний', 'розкішний'][S.ls]);

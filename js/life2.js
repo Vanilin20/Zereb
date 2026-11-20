@@ -103,7 +103,7 @@ function divorcePrompt(s, p, initiator) {
   var lawyer = M(s) * 0.4;
   function finish(share, txt) {
     var lose = assets * share;
-    var fromHome = 0; if (s.home && lose > Math.max(0, s.money)) { fromHome = s.home.val; s.money += s.home.val; s.home = null; s.own.homeLvl = 0; }
+    var fromHome = 0; if (s.home && lose > Math.max(0, s.money)) { fromHome = s.home.val; s.money += s.home.val; if (s.mort) { s.money -= s.mort.left; s.mort = null; } s.home = null; s.own.homeLvl = 0; s.house = null; }
     s.money -= lose; cashNote(s, 'Поділ майна при розлученні', -lose);
     s.partner = null; s.exes++; add(s, { happy: -12 }); mark(s, 'Розлучення з ' + p.name);
     if (DIV_STIGMA.indexOf(c.code) >= 0) { add(s, { social: -6 }); s.parents.forEach(function (x) { x.rel -= 10; }); }

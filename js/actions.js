@@ -250,7 +250,7 @@ function emigrate(s, code, how) {
   if (s.job) endJob(s, 'еміграція');
   s.biz.slice().forEach(function (b) { closeBiz(s, b, 'продано через переїзд', bizValue(s, b) * 0.6); });
   s.friends = Math.floor(s.friends * 0.3); s.withParents = false; s.urban = true;
-  if (s.home) { s.money += s.home.val; s.home = null; }
+  if (s.home) { s.money += s.home.val; s.home = null; } if (s.mort) { s.money -= s.mort.left; s.mort = null; } s.house = null;
   s.own.homeLvl = 0; if (s.own.car && s.own.car !== 'bike') { s.money += s.own.carVal * 0.8; s.own.car = null; s.own.carVal = 0; }
   if (s.partner && !s.partner.married) { s.partner = null; s.exes++; }
   add(s, { happy: -6 });
