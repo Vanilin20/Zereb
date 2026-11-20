@@ -125,7 +125,7 @@ function jobOptions(s, apps) {
     var pay = jobBase(s, j) * immFactor(s);
     if (j.vol) pay *= fameMult(s.fame);
     var ai = x.c.viaHobby ? altInfo(s, j) : null;
-    return { t: j.n, sub: 'шанс ' + Math.round(p * 100) + '% · ~' + fmt(pay) + '/рік' + (ai ? ' · через хобі (' + SKILL_NAMES[ai.k] + ')' : '') + (j.vol ? ' · дохід залежить від слави' : ''),
+    return { t: j.n, sub: 'шанс ' + Math.round(p * 100) + '% · ~' + fmt(pay) + '/рік' + (ai ? ' · через хобі (' + (SKILL_NAMES[ai.k] || 'популярність') + ')' : '') + (j.vol ? ' · дохід залежить від слави' : ''),
       f: function () {
         if (chance(p)) { takeJob(s, j, !!s.study); add(s, { happy: 5 }); return 'Тебе взяли: ' + j.n + (s.job.part ? ' (неповний день, поки вчишся)' : '') + '!' + (ai ? ' Хобі стало професією.' : ''); }
         off.used.push(j.id); apps--; if (apps <= 0) return 'Відмова на посаду «' + j.n + '»: ' + whyNot(s, j) + '. На цей рік спроби вичерпано.';

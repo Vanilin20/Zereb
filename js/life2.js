@@ -210,7 +210,7 @@ function snapDiff(s) {
   var pe = pickEvents;
   pickEvents = function (s, out) {
     var evs = EVENTS, wrapped = evs.map(function (e) { var r0 = e.run; return { e: e, r0: r0 }; });
-    wrapped.forEach(function (x) { x.e.run = function (s2) { s2._snap = snapOf(s2); var r = x.r0(s2); return r; }; });
+    wrapped.forEach(function (x) { if (x.e.q == null) x.e.q = /opts\s*:/.test(x.r0.toString()); x.e.run = function (s2) { s2._snap = snapOf(s2); var r = x.r0(s2); return r; }; });
     try { pe(s, out); } finally { wrapped.forEach(function (x) { x.e.run = x.r0; }); }
     s._snap = null;
   };

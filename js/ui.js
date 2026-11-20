@@ -113,7 +113,7 @@
       st(c.le + ' р.', 'очікувана тривалість життя') + st((c.u5 / 10).toFixed(1) + '%', 'помирають до 5 років') +
       st(fmt(c.gdp * 1000), 'ВВП на душу (ПКС)') + st(Math.round(c.sec * 100) + '%', 'закінчують старшу школу') + '</div>' +
       rulesHTML(c) + (C(S).conflict === 2 ? '<p class="note">У країні зараз іде війна або збройний конфлікт.</p>' : '');
-    modal(c.name, body, [{ t: 'Почати життя', f: function () { closeModal(); render(); } }]);
+    modal(c.name, body, [{ t: 'Почати життя', f: function () { closeModal(); render(); setSpeed(1); } }]);
   }
   function decileBar(d) {
     var h = '<div class="dec" aria-label="Дециль статку ' + d + ' з 10">';
@@ -329,9 +329,12 @@
 
   // ---------- Час ----------
   var speed = 0, acc = 0, lastT = Date.now(), dragging = false, YEAR_MS = { 1: 6000, 2: 3000, 4: 1500 };
-  function setSpeed(v) { speed = v; acc = 0; Array.prototype.forEach.call(document.querySelectorAll('.spd'), function (b) { b.classList.toggle('on', +b.dataset.spd === speed); }); }
+  function setSpeed(v) { if (v && speed && v !== speed) acc = acc / YEAR_MS[speed] * YEAR_MS[v]; else if (!v) acc = acc; speed = v; Array.prototype.forEach.call(document.querySelectorAll('.spd'), function (b) { b.classList.toggle('on', +b.dataset.spd === speed); }); }
+  // повзунок відпустили будь-де (або його перемалювали) — час іде далі
+  ['pointerup', 'pointercancel', 'blur'].forEach(function (e) { window.addEventListener(e, function () { dragging = false; }); });
   setInterval(function () {
-    var now = Date.now(), dt = now - lastT; lastT = now;
+    var now = Date.now(), dt = Math.min(500, now - lastT); lastT = now;
+    if (dragging && !document.querySelector('input[type=range]:active')) dragging = false;
     var run = speed && S && S.alive && !$('game').classList.contains('hidden') && $('modal').classList.contains('hidden') && !dragging;
     if (run) { acc += dt; if (acc >= YEAR_MS[speed]) { acc = 0; nextYear(1); } }
     $('yrbar').style.width = (speed ? Math.min(100, acc / YEAR_MS[speed] * 100) : 0) + '%';

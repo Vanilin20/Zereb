@@ -16,22 +16,22 @@ function polTargets(s) {
   if (o === 0) t.push(1);
   if (o === 1) t.push(2, 3);
   if (o === 2) t.push(3);
-  if ((o === 2 || o === 3 || o === 4) && s.fame >= 30 && s.age >= 35 && s.birth === s.country) t.push(5);   // глава держави — лише народжені в країні
+  if ((o === 2 || o === 3 || o === 4) && s.fame >= 45 && s.age >= 35 && s.birth === s.country && !autocracy(s) && !(s.pol.lostTop && s.age - s.pol.lostTop < 10)) t.push(5);   // після поразки на найвищих виборах партія не висуне ще 10 років   // глава держави — лише народжені в країні
   return t;
 }
-var OFFICE_BAR = [0, 52, 58, 60, 0, 68];   // скільки «очок» треба, щоб перемогти
+var OFFICE_BAR = [0, 52, 58, 60, 0, 80];   // скільки «очок» треба, щоб перемогти
 var OFFICE_AD = [0, 0.2, 0.8, 1.5, 0, 5];   // ціна реклами (× медіанний дохід)
 
 function campaign(s, target) {
-  var P = s.pol, offs = offices(s), score = 0, notes = [], c = C(s);
-  var base = 35 + s.st.social / 5 + s.fame / 3 + P.approval / 8 + (s.edu >= 5 ? 3 : 0) + (s.immigrant ? -12 : 0);
+  var P = s.pol, offs = offices(s), score = 0, notes = [], c = C(s), oppStr = gauss() * 6 + (P.office === target ? -(P.approval - 50) / 6 : 0) + [0, 0, 3, 10, 0, 22][target] + (target === 5 && autocracy(s) ? 20 : 0);
+  var base = 35 + s.st.social / 5 + s.fame / 5 + P.approval / 10 + (s.edu >= 5 ? 3 : 0) + (s.immigrant ? -12 : 0);
   if (P.party === 'rul') base += (s.econ < 0 ? -8 : 6) + (autocracy(s) ? 25 : 0);
   if (P.party === 'opp') base += (s.econ < 0 ? 8 : -3) - (autocracy(s) ? 35 : 0);
   if (P.party === 'ind') base -= 6;
   if (target === 5 && P.office === 4) base += 5;
   score = base;
   function finish() {
-    var total = score + rnd(-10, 10), bar = OFFICE_BAR[target];
+    var total = score + gauss() * 7, bar = OFFICE_BAR[target] + oppStr;
     P.nextElec = s.age + electionCycle(s);
     if (total >= bar) {
       var prev = P.office; P.office = target; P.term = electionCycle(s); P.approval = clamp(50 + (total - bar)); P.terms = prev === target ? P.terms + 1 : 1;
@@ -40,7 +40,8 @@ function campaign(s, target) {
       mark(s, offs[target] + (prev === target ? ' (переобрано)' : ''));
       return 'Перемога! ' + Math.round(50 + (total - bar) / 2) + '% голосів. Тепер ти — ' + offs[target].toLowerCase() + '.' + (notes.length ? ' ' + notes.join(' ') : '');
     }
-    add(s, { happy: -8 }); if (P.office === target) { P.office = Math.max(0, target === 5 ? 3 : target - 1); }
+    add(s, { happy: -8 }); if (target === 5) { P.lostTop = s.age; s.fame = clamp(s.fame - 10); }
+    if (P.office === target) { P.office = Math.max(0, target === 5 ? 3 : target - 1); } else if (P.term === 0 && P.office > 0) { P.office = 0; notes.push('Попередню посаду ти теж втрати' + g(s, 'в', 'ла') + '.'); }
     if (autocracy(s) && P.party === 'opp' && chance(0.25)) return court(s, '«екстремізм»', 2, 6);
     return 'Поразка: ' + Math.round(Math.max(3, 45 - (bar - total))) + '% голосів. Наступні вибори — через ' + electionCycle(s) + ' р.' + (notes.length ? ' ' + notes.join(' ') : '');
   }
@@ -73,7 +74,7 @@ function campaign(s, target) {
     { t: 'Компромат на суперника', sub: 'може вдарити по тобі', f: function () { if (chance(0.6)) score += 8; else { score -= 6; notes.push('Компромат виявився фейком — це обговорювали тиждень.'); } return debate(); } }
   ];
   if (c.law < 0.5) opts.push({ t: 'Підкупити виборців', sub: fmt(ad * 0.6) + ' · тут це «працює»', dis: s.money < ad * 0.6, f: function () { s.money -= ad * 0.6; score += 12; if (chance(c.law * 0.5)) { notes.push('Схему підкупу викрили журналісти.'); score -= 15; P.dirty = (P.dirty || 0) + 2; } return debate(); } });
-  return { title: 'Вибори: ' + offs[target].toLowerCase(), text: 'Ти йдеш як ' + partyName(P.party) + '. ' + (autocracy(s) ? (P.party === 'opp' ? 'Тут вибори контролює влада — опозиції майже нічого не світить.' : 'Тут вибори — формальність для правлячої партії.') : 'Як будуєш кампанію?'), opts: opts };
+  return { title: 'Вибори: ' + offs[target].toLowerCase(), text: (function () { var est = clamp(Math.round(50 + (base + 6 - OFFICE_BAR[target] - oppStr) * 1.3), 8, 85); return 'Суперник: ' + (oppStr > 4 ? 'сильний' : oppStr < -4 ? 'слабкий' : 'рівний тобі') + '. Опитування дають тобі ~' + est + '% (похибка ±7). '; })() + 'Ти йдеш як ' + partyName(P.party) + '. ' + (autocracy(s) ? (P.party === 'opp' ? 'Тут вибори контролює влада — опозиції майже нічого не світить.' : 'Тут вибори — формальність для правлячої партії.') : 'Як будуєш кампанію?'), opts: opts };
 }
 
 A({ id: 'politics', tab: 'work', n: 'Піти в політику', d: function (s) { return isCitizen(s) ? 'Партія, вибори, посади' + (s.birth !== s.country ? ' · главою держави може стати лише народжений тут' : '') : 'Потрібне громадянство цієї країни'; }, show: function (s) { return s.age >= 21 && !s.pol && !s.prison; },
@@ -100,9 +101,11 @@ function polTick(s, out) {
     if (P.term === 0) {
       var lim = P.office === 5 && P.terms >= 2 && !autocracy(s);
       if (lim) { mark(s, 'Заверши' + g(s, 'в', 'ла') + ' два терміни: ' + offs[5].toLowerCase()); say(s, 'Два терміни позаду — більше балотуватися не можна. Ти йдеш з посади як колишній ' + offs[5].toLowerCase() + '.', 'big'); s.polPast = P; s.pol = null; s.flags.exPres = 1; return; }
-      out.push({ title: 'Кінець терміну', text: 'Термін на посаді «' + offs[P.office].toLowerCase() + '» закінчується. Рейтинг: ' + Math.round(P.approval) + '%.', opts: [
+      out.push({ title: 'Кінець терміну', text: 'Термін на посаді «' + offs[P.office].toLowerCase() + '» закінчується. Рейтинг: ' + Math.round(P.approval) + '%. Можна переобратися або спробувати вище.', opts: polTargets(s).filter(function (tg) { return tg !== P.office; }).map(function (tg) {
+          return { t: 'Балотуватися: ' + offs[tg].toLowerCase(), sub: 'якщо програєш — втратиш і теперішню посаду', f: function () { var keep = P.office; var r = campaign(s, tg); return r; } };
+        }).concat([
         { t: 'Йти на переобрання', f: function () { return campaign(s, P.office === 4 ? 3 : P.office); } },
-        { t: 'Піти з політики', f: function () { s.polPast = P; s.pol = null; return 'Ти не ста' + g(s, 'в', 'ла') + ' переобиратися.'; } }] });
+        { t: 'Піти з політики', f: function () { s.polPast = P; s.pol = null; return 'Ти не ста' + g(s, 'в', 'ла') + ' переобиратися.'; } }]) });
       return;
     }
   }
@@ -112,6 +115,8 @@ function polTick(s, out) {
       { t: 'Погодитися', f: function () { P.office = 4; P.term = Math.max(P.term, 2); mark(s, 'Міністр'); s.fame = clamp(s.fame + 10); return 'Ти — міністр.'; } },
       { t: 'Лишитися в парламенті', f: function () { return 'Ти лишаєшся депутатом.'; } }] });
   }
+  // в автократії главу держави не обирають — його висуває партійна верхівка
+  if (autocracy(s) && P.office === 4 && P.party === 'rul' && P.approval > 65 && s.age >= 45 && chance(0.012)) { P.office = 5; P.term = 99; mark(s, offs[5]); s.fame = clamp(s.fame + 30); say(s, 'Партійна верхівка обрала тебе наступником. Ти — ' + offs[5].toLowerCase() + '.', 'big'); return; }
   if (P.office === 4 && P.approval < 30 && chance(0.4)) { P.office = 3; say(s, 'Тебе відправили у відставку з посади міністра.', 'bad'); }
   if (P.office === 5 && P.approval < 15 && !autocracy(s) && chance(0.3)) { say(s, 'Парламент оголосив тобі імпічмент.', 'big'); mark(s, 'Імпічмент'); s.polPast = P; s.pol = null; add(s, { happy: -20 }); return; }
 }

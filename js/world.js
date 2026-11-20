@@ -1,6 +1,6 @@
 // ЖЕРЕБ — світові кризи, старіння батьків, армія, повтори подій, спрощена мафія, епітафія
 
-function evOver(id, a, w, cond, run, once) { for (var i = EVENTS.length - 1; i >= 0; i--) if (EVENTS[i].id === id) EVENTS.splice(i, 1); if (run) ev(id, a, w, cond, run, once); }
+function evOver(id, a, w, cond, run, once) { for (var i = EVENTS.length - 1; i >= 0; i--) if (EVENTS[i].id === id) EVENTS.splice(i, 1); if (run) { ev(id, a, w, cond, run, once); EVENTS[EVENTS.length - 1].q = /opts\s*:/.test(run.toString()); } }
 
 // ======================================================================
 // Світові кризи: тривалі періоди, а не разові події
@@ -11,7 +11,7 @@ var CRISES = {
   pandemic: { n: 'Пандемія', yrs: [2, 2], start: 'Новий вірус шириться світом. Лікарні переповнені, кордони закриваються.', end: 'Пандемія відступила. Життя повертається до звичного.' },
   housing: { n: 'Обвал ринку житла', yrs: [2, 4], start: 'Ринок нерухомості обвалився: ціни на житло стрімко падають, банки не дають іпотек.', end: 'Ринок житла стабілізувався.' },
   inflation: { n: 'Гіперінфляція', yrs: [2, 3], local: 1, start: 'Національна валюта обвалилася. Ціни ростуть щотижня, заощадження в місцевій валюті тануть.', end: 'Інфляцію вдалося приборкати. Але гроші, що згоріли, не повернуться.' },
-  boom: { n: 'Економічний підйом', yrs: [2, 4], start: 'Економіка на підйомі: роботи багато, зарплати ростуть, бізнес процвітає.', end: 'Підйом вичерпався.' }
+  boom: { n: 'Економічний підйом', yrs: [2, 3], start: 'Економіка на підйомі: роботи багато, зарплати ростуть, бізнес процвітає.', end: 'Підйом вичерпався.' }
 };
 function crisisName(s) { return s.crisis ? CRISES[s.crisis.id].n : ''; }
 function startCrisis(s, id, out) {
@@ -40,7 +40,7 @@ function crisisTick(s, out) {
   else if (r < 0.055 && s.year > 2026) startCrisis(s, 'pandemic', out);
   else if (r < 0.07) startCrisis(s, 'housing', out);
   else if (r < 0.07 + (UNSTABLE.indexOf(s.country) >= 0 ? 0.04 : 0.003)) startCrisis(s, 'inflation', out);
-  else if (r < 0.15) startCrisis(s, 'boom', out);
+  else if (r < 0.11) startCrisis(s, 'boom', out);
 }
 function pandemicPrompt(s) {
   var rich = C(s).gdp > 20, risk = s.age > 70 ? 0.3 : s.age > 50 ? 0.12 : 0.05;
@@ -198,7 +198,8 @@ evOver('tutor', [14, 17], 2, function (s) { return s.q >= 3 && s.study && s.stud
 // ======================================================================
 var EV_CD = { unexp: 1, airraid: 1, heat: 2, flood: 3, commute: 3 };
 pickEvents = function (s, out) {
-  s.seenAt = s.seenAt || {};
+  s.seenAt = s.seenAt || {}; s.pyr = s.pyr || [];
+  var hadPrompt = out.length > 0, calm = s.pyr.length >= 2 && s.pyr[0] && s.pyr[1];   // два роки поспіль з виборами — дати перепочити
   var pool = EVENTS.filter(function (e) {
     if (s.age < e.a[0] || s.age > e.a[1] || (e.once && s.seen[e.id]) || (e.if && !e.if(s))) return false;
     var n = s.seen[e.id] || 0, cd = EV_CD[e.id] != null ? EV_CD[e.id] : 5;
@@ -206,18 +207,39 @@ pickEvents = function (s, out) {
     if (n >= (EV_CD[e.id] ? 8 : 4)) return false;
     return true;
   });
-  var n = 0, maxN = s.age < 6 ? 1 : 2;
+  var n = 0, prompts = 0;
   shuffle(pool).forEach(function (e) {
-    if (n >= maxN || !s.alive) return;
+    if (n >= (s.age < 6 ? 1 : 2) || !s.alive) return;
+    var isQ = e.q == null ? (e.q = /opts\s*:/.test(e.run.toString())) : e.q;
+    if (isQ && (prompts || hadPrompt || calm || out.length >= 2)) return;
     var w = typeof e.w === 'function' ? e.w(s) : (e.w == null ? 1 : e.w);
     w /= 1 + (s.seen[e.id] || 0) * 0.7;
-    if (!chance(0.08 * w)) return;
+    if (!chance((isQ ? 0.045 : 0.07) * w)) return;
     n++; s.seen[e.id] = (s.seen[e.id] || 0) + 1; s.seenAt[e.id] = s.age;
     var r = e.run(s);
     if (!r) return;
-    if (typeof r === 'string') say(s, r, e.k || ''); else { r.title = r.title || e.title || 'Подія'; out.push(r); }
+    if (typeof r === 'string') say(s, r, e.k || '');
+    else { prompts++; r.title = r.title || e.title || 'Подія'; spice(s, r); out.push(r); }
   });
+  s.pyr.unshift(out.length > 0); s.pyr.length = 2;
 };
+// трохи непередбачуваності: інколи наслідок вибору має несподіваний поворот
+EVENTS.forEach(function (e) { if (e.q == null) e.q = /opts\s*:/.test(e.run.toString()); });
+var TWISTS = [
+  [function (s) { var a = M(s) * rnd(0.02, 0.08); s.money += a; return 'А ще випадково знайшлися гроші, про які ти забу' + g(s, 'в', 'ла') + ': +' + fmt(a) + '.'; }],
+  [function (s) { var a = M(s) * rnd(0.02, 0.06); s.money -= a; return 'Але по дорозі ти загуби' + g(s, 'в', 'ла') + ' гаманець: −' + fmt(a) + '.'; }],
+  [function (s) { add(s, { social: 4 }); s.friends++; return 'Через цю історію ти познайоми' + g(s, 'вся', 'лася') + ' з цікавою людиною.'; }],
+  [function (s) { add(s, { happy: -5 }); return 'Але хтось переказав усе інакше — тепер про тебе пліткують.'; }],
+  [function (s) { add(s, { health: -4 }); return 'Від нервів ти тиждень хворі' + g(s, 'в', 'ла') + '.'; }],
+  [function (s) { add(s, { happy: 6 }); return 'Несподівано це підняло настрій на весь місяць.'; }],
+  [function (s) { if (s.job) { s.job.perf += 6; return 'Про це дізнався начальник — і оцінив.'; } add(s, { smarts: 2 }); return 'Ти зроби' + g(s, 'в', 'ла') + ' з цього корисні висновки.'; }]
+];
+function spice(s, r) {
+  (r.opts || []).forEach(function (o) {
+    var f0 = o.f; if (!f0 || o.spiced) return; o.spiced = 1;
+    o.f = function () { var res = f0.apply(this, arguments); if (typeof res === 'string' && s.alive && chance(0.13)) res += ' ' + pick(TWISTS)[0](s); return res; };
+  });
+}
 
 // ======================================================================
 // Мафія: одна кнопка «Рік в угрупованні» замість трьох

@@ -349,7 +349,7 @@ function bizTick(s, out) {
     roi += Math.min(0.05, Object.keys(otherSec).length * 0.02) - sameSec * 0.04;   // різні сфери підтримують одна одну, однакові — конкурують
     var prof = b.cap * roi;
     if (b.mgr) prof -= c.median * 0.8;
-    if (b.staff) { var prod = 0.9 + q / 160 + gauss() * 0.15 + (s.econ < 0 ? -0.25 : s.econ > 0 ? 0.08 : 0) - (b.cap > sat ? 0.1 * Math.log2(b.cap / sat) : 0) - Math.max(0, b.staff - 20) * 0.003; prof += b.staff * c.median * 0.9 * (prod - 1); }
+    if (b.staff) { var prod = 0.85 + q / 250 + gauss() * 0.15 - Math.max(0, b.staff - 5) * 0.008 + (s.econ < 0 ? -0.25 : s.econ > 0 ? 0.08 : 0) - (b.cap > sat ? 0.1 * Math.log2(b.cap / sat) : 0) - Math.max(0, b.staff - 20) * 0.003; prof += b.staff * c.median * 0.9 * (prod - 1); }
     if (b.fran != null) { if (chance(clamp((q - 40) / 100 + 0.1, 0.02, 0.6))) { var nf = ri(1, 2); b.fran += nf; say(s, '«' + b.name + '»: +' + nf + ' франчайзі. Усього: ' + b.fran + '.', 'good'); } if (b.fran > 0 && q < 35 && chance(0.15)) { b.fran--; say(s, 'Франчайзі пішов від «' + b.name + '» — бренд слабшає.', 'bad'); } b.fran = Math.min(b.fran, (BIZ_SCALE[b.type] || 20) * 2); prof += b.fran * c.median * 0.25; }
     var ctax = prof > 0 ? prof * corpTax(s, b) : 0; prof -= ctax; s.yrTax = (s.yrTax || 0) + ctax;
     b.cash += prof; b.last = prof; b.hist.push(prof); b.yrs++; s.bizYears++;
@@ -616,7 +616,7 @@ function finTick(s, ownerPay, side) {
   if (s.pol && s.pol.office > 0) { var ps = polSalary(s); inc += ps; I('Зарплата на посаді', ps); }
   var adult = s.age >= 18;
   if (adult && !s.job && !s.study && !s.retired && !s.biz.length && c.gdp > 30 && (isCitizen(s) || resStatus(s) === 'pr')) { inc += c.median * 0.3; I('Допомога з безробіття', c.median * 0.3); }
-  var rent = 0; s.rentals.forEach(function (r) { r.val *= 1 + 0.01 + 0.05 * gauss() + s.econ * 0.05; rent += r.val * (0.42 / c.house); }); inc += rent; I('Оренда твоїх квартир', rent);
+  var rent = 0, rcost = 0; s.rentals.forEach(function (r) { r.val *= 1 + 0.01 + 0.05 * gauss() + s.econ * 0.05; var y = r.y || 0.3 / c.house, g0 = r.val * y; if (chance(0.12)) g0 *= 1 - rnd(0.15, 0.45); rcost += r.val * 0.012 + (s.rentals.length > 2 ? g0 * 0.1 : 0); if (chance(0.04)) { rcost += r.val * rnd(0.04, 0.12); say(s, 'Орендарі зіпсували квартиру й зникли, не заплативши. Ремонт за твій рахунок.', 'bad'); } rent += g0; }); inc += rent - rcost; I('Оренда твоїх квартир', rent); E('Утримання квартир (ремонт, управління, простої)', rcost);
   if (s.home) s.home.val *= 1 + 0.01 + 0.05 * gauss() + s.econ * 0.05;
   var pshare = 0;
   if (s.partner && (s.partner.married || s.partner.yrs >= 2) && s.age >= 18) { pshare = s.partner.inc * 0.5 * (s.partner.jobless ? 0.2 : 1); I('Внесок партнера', pshare); }
@@ -626,7 +626,7 @@ function finTick(s, ownerPay, side) {
   var sr = 0.055 + 0.16 * gauss() + s.econ * 0.12 + (s.crash ? -0.35 : 0); s.inv.stk *= Math.max(0.45, 1 + sr); s.crash = 0;
   var cr = Math.exp(-0.15 + 0.6 * gauss()); s.inv.cry *= cr;
   var gain = s.inv.dep + s.inv.stk + s.inv.cry - g0;
-  if (gain > 0) { var gt = gain * c.capTax; s.inv.dep -= gt * 0.2; s.inv.stk -= gt * 0.5; s.inv.cry -= gt * 0.3; if (s.inv.dep < 0) s.inv.dep = 0; s.lastTax += gt; }
+  if (gain > 0) { var gt = gain * c.capTax, invT = s.inv.dep + s.inv.stk + s.inv.cry; if (invT > 0) { gt = Math.min(gt, invT); ['dep', 'stk', 'cry'].forEach(function (k) { s.inv[k] = Math.max(0, s.inv[k] - gt * s.inv[k] / invT); }); s.lastTax += gt; } }
   s.lastInvGain = gain;
   var prop = ((s.home ? s.home.val : 0) + s.rentals.reduce(function (a, r) { return a + r.val; }, 0)) * c.propTax;
   var wt = c.wealthTax && netWorth(s) > c.median * 25 ? (netWorth(s) - c.median * 25) * c.wealthTax : 0;
@@ -904,7 +904,7 @@ function gangRisk(s) {
     death: [0.012, 0.02, 0.03, 0.04, 0.05][g2.rank] * (narco ? (cartel(s) ? 1.5 : 1.8) : 1) * (s.gangWar ? 2.5 : 1) * (g2.warYrs > 0 ? 2 : 1) * (s.used.lowkey ? 0.6 : 1),
     // нижчі звання роблять «брудну» роботу на вулиці, верхівка прикрита людьми й купленими поліцейськими;
     // але в країнах із сильним законом за верхівкою полюють роками (як у справах RICO)
-    arrest: clamp(([0.06, 0.05, 0.035, 0.025, 0.02][g2.rank] + (g2.heat || 0) * 0.025) * (0.15 + c.law * 1.2) * (s.used.bribe ? Math.max(0.15, 0.4 - g2.rank * 0.06) : 1) * (s.used.lowkey ? 0.6 : 1) * (cartel(s) ? 0.4 : 1) * (c.law > 0.7 && g2.rank >= 3 ? 1.4 : 1), 0.003, 0.8)
+    arrest: clamp(([0.035, 0.03, 0.025, 0.02, 0.018][g2.rank] + (g2.heat || 0) * 0.015) * (0.15 + c.law * 1.2) * (s.used.bribe ? Math.max(0.15, 0.4 - g2.rank * 0.06) : 1) * (s.used.lowkey ? 0.6 : 1) * (cartel(s) ? 0.4 : 1) * (c.law > 0.7 && g2.rank >= 3 ? 1.4 : 1), 0.003, 0.8)
   };
 }
 function gangTick(s, out) {
@@ -925,8 +925,9 @@ function gangTick(s, out) {
   }
   if (g2.warYrs > 0) { g2.warYrs--; if (!g2.warYrs) say(s, 'Війна з колишніми «своїми» вщухла.', 'good'); }
   if (g2.own) { if (g2.perf > 60 && (g2.size || 1) < 6 && chance(0.25)) { g2.size = (g2.size || 1) + 1; say(s, 'Твоя ' + (g2.kind === 'картель' ? 'організація' : 'сімʼя') + ' росте: до тебе перейшли нові люди.', 'good'); } return; }
-  if (g2.rank === 0 && g2.perf > 58 && g2.yrs >= 2 && !g2.askedInit) { g2.askedInit = 1; out.push(initiation(s)); return; }
-  if (g2.rank >= 1 && g2.rank < 3 && g2.perf > 62 + g2.rank * 8 && g2.yrs >= 3 && chance([0, 0.12, 0.05][g2.rank] * (1 + (g2.perf - 60) / 50))) { g2.rank++; say(s, 'Тебе підвищили: тепер ти ' + rankName(g2).toLowerCase() + ' (' + g2.kind + ').', 'big'); mark(s, rankName(g2)); }
+  g2.heat = Math.max(0, (g2.heat || 0) - (s.used.lowkey ? 2 : 1));   // розшук поволі спадає
+  if (g2.rank === 0 && (g2.rep || 0) >= REP_NEED[1] && !g2.askedInit) { g2.askedInit = 1; out.push(initiation(s)); return; }
+  if (g2.rank >= 1 && g2.rank < 3 && (g2.rep || 0) >= REP_NEED[g2.rank + 1] && chance(g2.rank === 2 ? 0.35 : 0.6)) { g2.rank++; say(s, 'Тебе підвищили: тепер ти ' + rankName(g2).toLowerCase() + ' (' + g2.kind + ').', 'big'); mark(s, rankName(g2)); }
 }
 function initiation(s) {
   var g2 = s.gang, cart = g2.kind === 'картель';
@@ -971,7 +972,7 @@ function creditTick(s, out) {
   var heavy = s.debt > Math.max(3 * Math.max(s.lastInc, 1), 2 * M(s));
   s.debtYrs = heavy ? (s.debtYrs || 0) + 1 : 0;
   if (s.debtYrs >= 2 && s.age >= 18 && !s.flags.bankrupt) out.push({ title: 'Борги душать', text: 'Борг ' + fmt(s.debt) + ' — це кілька твоїх річних доходів, і він росте через відсотки. Кредитний рейтинг: ' + Math.round(s.credit) + '.', opts: [
-    { t: 'Оголосити банкрутство', sub: 'частину боргу спишуть, майно продадуть, 7 років без кредитів', f: function () { if (s.home) { s.debt -= s.home.val; s.home = null; } s.rentals = []; s.debt = Math.max(0, s.debt * 0.2); s.credit = 5; s.flags.bankrupt = 7; s.debtYrs = 0; mark(s, 'Банкрутство'); add(s, { happy: -8 }); return 'Банкрутство оголошено. Борг зменшено до ' + fmt(s.debt) + '.'; } },
+    { t: 'Оголосити банкрутство', sub: 'частину боргу спишуть, майно продадуть, 7 років без кредитів', f: function () { var sold = 0; if (s.home) { sold += s.home.val; s.debt -= s.home.val; s.home = null; } s.rentals.forEach(function (r) { sold += r.val; s.debt -= r.val; }); s.rentals = []; if (sold) cashNote(s, 'Продаж майна при банкрутстві', sold); var before = Math.max(0, s.debt); s.debt = Math.max(0, s.debt * 0.2); cashNote(s, 'Списано боргу при банкрутстві', before - s.debt); if (s.debt <= 0 && s.money < 0) s.money = 0; s.credit = 5; s.flags.bankrupt = 7; s.debtYrs = 0; mark(s, 'Банкрутство'); add(s, { happy: -8 }); return 'Банкрутство оголошено. Борг зменшено до ' + fmt(s.debt) + '.'; } },
     { t: 'Платити далі', sub: 'стрес, але без мітки в історії', f: function () { add(s, { happy: -8, health: -3 }); s.debtYrs = 0; return 'Ти виріши' + g(s, 'в', 'ла') + ' розплачуватися сам' + g(s, '', 'а') + '.'; } }] });
 }
 function mentalTick(s) {
