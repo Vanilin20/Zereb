@@ -46,11 +46,12 @@
   function closeModal() { $('modal').classList.add('hidden'); }
 
   // Показ підказки рушія (вибір). done() — коли ланцюжок завершився.
-  function prompt(p, done, closable) {
+  function prompt(p, done, closable, useId) {
     var body = '<p>' + esc(p.text || '') + '</p>';
     modal(p.title || 'Подія', body, p.opts.map(function (o) {
       return { t: o.t, sub: o.sub, dis: o.dis, f: function () {
         if (!S._snap) S._snap = snapOf(S);
+        if (useId) S.used[useId] = 1;   // раз на рік зараховується лише тоді, коли щось обрано
         var r = o.f(); normMoney(S);
         if (r && typeof r === 'object') { prompt(r, done, closable); return; }
         if (r) { say(S, r, 'me'); toast(r); }
@@ -282,11 +283,14 @@
     });
     if (!anyA) box.innerHTML = '<div class="none">' + (S.age < 5 ? 'Ти ще зовсім маленьк' + g(S, 'ий', 'а') + '. Просто живи.' : 'Зараз тут нічого не доступно.') + '</div>';
   }
+  var openCache = {};   // меню «раз на рік», відкрите й закрите без вибору, наступного разу показує ті самі варіанти
   function act(a) {
     S._snap = snapOf(S);
-    var r = doAction(S, a);
+    var ck = S.id + ':' + a.id + ':' + S.age, r;
+    if (a.ap > 0 && openCache[ck] && !S.used[a.id]) r = openCache[ck];
+    else { r = doAction(S, a); if (a.ap > 0 && r && typeof r === 'object') openCache[ck] = r; }
     if (r == null) { S._snap = null; return; }
-    if (typeof r === 'object') { prompt(r, function () { if (!S.alive) finish(); }, true); render(); return; }
+    if (typeof r === 'object') { var uid = a.ap > 0 ? a.id : null; if (uid) S.used[uid] = 0; prompt(r, function () { if (!S.alive) finish(); }, true, uid); render(); return; }
     say(S, r, 'me'); S._snap = null; toast(r); render(); save();
     if (!S.alive) finish();
   }
